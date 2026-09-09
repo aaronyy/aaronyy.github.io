@@ -98,7 +98,8 @@
      together (Kuramoto), so a stray bird catches the flock instead of
      drifting on its own clock. flapRate is a tiny personal tempo, not a
      second oscillator. */
-  var CAM = 0.95;                       // look down, off vertical, so a flap has height
+  var CAM = 0.55;                       // enough height on a flap, not a toy camera
+  var gatherDir = 1;                   // cruise heading for the V's lead bird
 
   function buildBirds() {
     var count = W < 700 ? 7 : W < 1200 ? 11 : 15;
@@ -110,11 +111,11 @@
         y: rand(H * 0.08, H * 0.82),
         vx: Math.cos(a) * rand(0.5, 1.3),
         vy: Math.sin(a) * rand(0.5, 1.3) * 0.4,
-        size: rand(18, 28),
+        size: rand(14, 18),
         heading: a,
         roll: 0,
-        pitch: 0.14,
-        z: rand(-0.65, 0.85),
+        pitch: 0.08,
+        z: rand(-0.45, 0.55),
         flapPhase: rand(0, 0.2),
         flapRate: rand(0.98, 1.02),
         wanderSeed: rand(0, 1000),
@@ -162,13 +163,14 @@
     t += dt;
 
     var elapsed = t - modeSince;
-    var blend = mode === 'idle' ? 1 : Math.min(1, elapsed / 45);
+    var blend = mode === 'idle' ? 1 : Math.min(1, elapsed / 20);
     var leader = birds[0];
 
     for (var i = 0; i < birds.length; i++) {
       var b = birds[i];
       var f = flockForces(b, i);
       var maxSpeed = 1.55;
+      var slotX = b.x, slotY = b.y, hasSlot = false;
 
       /* ---- wander: cheap smooth noise from stacked sines ---- */
       var n = b.wanderSeed;
@@ -176,22 +178,37 @@
       f.y += Math.cos(t * 0.009 + n * 1.7) * 0.010;
 
       if (mode === 'gather') {
-        /* the flock folds into a V trailing the lead bird */
-        maxSpeed = 1.9;
+        /* Flocking and wander fight the V, so they fade out as the
+           formation takes over. The lead bird cruises in one heading;
+           everyone else owns a slot on a wide chevron behind it. */
+        var hold = 1 - blend;
+        f.x *= hold;
+        f.y *= hold;
+        maxSpeed = 2.2;
         if (i === 0) {
-          f.x += (W * 0.42 - b.x) * 0.00035;
-          f.y += (H * 0.34 - b.y) * 0.00035;
+          var cruise = gatherDir > 0 ? -0.05 : Math.PI + 0.05;
+          var cs = 0.9;
+          var homeX = W >= 992 ? W * 0.55 : W * 0.55;
+          var homeY = H * 0.32;
+          f.x += (homeX - b.x) * 0.012 * blend;
+          f.y += (homeY - b.y) * 0.012 * blend;
+          f.x += (Math.cos(cruise) * cs - b.vx) * 0.12 * blend;
+          f.y += (Math.sin(cruise) * cs - b.vy) * 0.12 * blend;
         } else {
+          hasSlot = true;
           var rank = Math.ceil(i / 2);
           var side = i % 2 ? 1 : -1;
-          var hx = leader.vx, hy = leader.vy;
-          var hm = Math.hypot(hx, hy) || 1;
-          hx /= hm; hy /= hm;
-          var spacing = 44 * rank;
-          var tx = leader.x - hx * spacing + -hy * side * spacing * 0.72;
-          var ty = leader.y - hy * spacing + hx * side * spacing * 0.72;
-          f.x += (tx - b.x) * 0.0055 * blend;
-          f.y += (ty - b.y) * 0.0055 * blend;
+          var hx = Math.cos(leader.heading), hy = Math.sin(leader.heading);
+          var back = 22 * rank;
+          var out = 26 * rank;
+          slotX = leader.x - hx * back - hy * side * out;
+          slotY = leader.y - hy * back + hx * side * out;
+          f.x += (slotX - b.x) * 0.018 * blend;
+          f.y += (slotY - b.y) * 0.018 * blend;
+          f.x += (leader.vx - b.vx) * 0.10 * blend;
+          f.y += (leader.vy - b.vy) * 0.10 * blend;
+          var dist = Math.hypot(slotX - b.x, slotY - b.y);
+          maxSpeed = clamp(1.8 + dist * 0.01, 1.8, 5.2);
         }
 
       } else if (mode === 'race') {
@@ -214,7 +231,7 @@
         f.y += (ty - b.y) * 0.0062 * blend;
       }
 
-      limit(f, 0.22);
+      limit(f, mode === 'gather' ? 0.55 : 0.22);
       b.vx += f.x * dt;
       b.vy += f.y * dt;
 
@@ -232,15 +249,31 @@
       b.x += b.vx * dt;
       b.y += b.vy * dt;
 
+      if (hasSlot) {
+        b.x += (slotX - b.x) * 0.08 * blend * dt;
+        b.y += (slotY - b.y) * 0.08 * blend * dt;
+      }
+
+      if (mode === 'gather' && i === 0) {
+        var rankMax = Math.ceil((birds.length - 1) / 2) || 1;
+        var trail = 22 * rankMax + 36;
+        var spread = 26 * rankMax + 24;
+        b.x = clamp(b.x, gatherDir > 0 ? trail : 60, gatherDir > 0 ? W - 60 : W - trail);
+        b.y = clamp(b.y, spread, H - spread);
+      }
+
       /* wrap with a generous margin so nothing pops at the edge, and drop the
-         trail on the way through or it gets drawn straight across the page */
-      var pad = 90;
-      var wrapped = false;
-      if (b.x < -pad)     { b.x = W + pad; wrapped = true; }
-      if (b.x > W + pad)  { b.x = -pad;    wrapped = true; }
-      if (b.y < -pad)     { b.y = H + pad; wrapped = true; }
-      if (b.y > H + pad)  { b.y = -pad;    wrapped = true; }
-      if (wrapped) b.trail.length = 0;
+         trail on the way through or it gets drawn straight across the page.
+         Skip it in gather so birds fly to the V instead of teleporting. */
+      if (mode !== 'gather') {
+        var pad = 90;
+        var wrapped = false;
+        if (b.x < -pad)     { b.x = W + pad; wrapped = true; }
+        if (b.x > W + pad)  { b.x = -pad;    wrapped = true; }
+        if (b.y < -pad)     { b.y = H + pad; wrapped = true; }
+        if (b.y > H + pad)  { b.y = -pad;    wrapped = true; }
+        if (wrapped) b.trail.length = 0;
+      }
 
       var h = Math.atan2(b.vy, b.vx);
       var dh = h - b.heading;
@@ -248,8 +281,9 @@
       while (dh < -Math.PI) dh += Math.PI * 2;
       b.heading = h;
       var targetRoll = clamp(-dh / Math.max(dt, 0.001) * 0.42, -0.95, 0.95);
+      if (mode === 'gather') targetRoll *= 0.35;
       b.roll += (targetRoll - b.roll) * Math.min(1, 0.14 * dt);
-      var targetPitch = clamp(0.14 - b.vy * 0.16, -0.35, 0.45);
+      var targetPitch = clamp(0.10 - b.vy * 0.14, -0.28, 0.32);
       b.pitch += (targetPitch - b.pitch) * Math.min(1, 0.10 * dt);
 
       b.z += Math.sin(t * 0.0065 + n * 0.4) * 0.003 * dt;
@@ -287,34 +321,24 @@
 
   /* ------------------------------------------------------------ drawing */
 
-  function signedArea(pts) {
-    var a = 0;
-    for (var i = 0, n = pts.length; i < n; i++) {
-      var p = pts[i], q = pts[(i + 1) % n];
-      a += p.x * q.y - q.x * p.y;
-    }
-    return a;
-  }
-
-  function fillPoly(pts, color, alpha) {
+  function fillPoly(pts, alpha) {
     if (pts.length < 3 || alpha <= 0.01) return;
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.closePath();
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = color;
+    ctx.fillStyle = '#d8c9a3';
     ctx.fill();
   }
 
-  /* Local bird space is X forward, Y right, Z up. Roll / pitch / heading
-     then a downward camera so the upstroke foreshortens and a bank shows
-     one wing large and one thin. */
+  /* One material, three planes. The 3D is only in the wing stroke and a
+     quiet bank — enough to read as volume, nothing to decorate. */
   function drawBird(b) {
     var flap = Math.sin(b.flapPhase);
-    var flapA = 0.22 + flap * 0.95;        // rest with dihedral; stroke goes well above/below
-    var s = b.size * (1.12 + b.z * 0.42);
-    var alpha = 0.46 + 0.42 * (b.z + 1) * 0.5;
+    var flapA = 0.14 + flap * 0.52;
+    var s = b.size * (1 + b.z * 0.12);
+    var alpha = 0.58 + 0.12 * (b.z + 1) * 0.5;
 
     var ch = Math.cos(b.heading), sh = Math.sin(b.heading);
     var cr = Math.cos(b.roll), sr = Math.sin(b.roll);
@@ -336,26 +360,13 @@
       };
     }
 
-    /* Contact shadow, stretched with the wing stroke so the bird sits in space. */
-    var spread = 0.45 + 0.55 * Math.cos(flapA);
-    ctx.save();
-    ctx.globalAlpha = alpha * 0.16;
-    ctx.fillStyle = '#000';
-    ctx.beginPath();
-    ctx.ellipse(b.x, b.y + s * 0.42, s * 0.95 * Math.abs(spread), s * 0.16, b.heading, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
     function wing(side) {
       var a = side * flapA;
       var ca = Math.cos(a), sa = Math.sin(a);
-      var sweep = s * 0.10 * (1 - flap);   // tips trail on the downstroke
       var raw = [
-        [s * 0.08, side * s * 0.05, s * 0.02],
-        [s * 0.12 - sweep * 0.3, side * s * 0.62, s * 0.04],
-        [-sweep, side * s * 1.35, s * 0.06],
-        [-s * 0.32 - sweep * 0.4, side * s * 0.88, 0],
-        [-s * 0.18, side * s * 0.08, -s * 0.02]
+        [s * 0.12, side * s * 0.04, 0],
+        [s * 0.02, side * s * 1.15, 0],
+        [-s * 0.24, side * s * 0.18, 0]
       ];
       var pts = [];
       for (var i = 0; i < raw.length; i++) {
@@ -365,56 +376,21 @@
       return pts;
     }
 
-    function paintWing(pts) {
-      var area = signedArea(pts);
-      var underside = area > 0;
-      fillPoly(pts, underside ? '#6f6a60' : '#d8c9a3', alpha * (underside ? 0.82 : 1));
-      if (Math.abs(area) < 40) {
-        ctx.globalAlpha = alpha * 0.8;
-        ctx.strokeStyle = underside ? '#8a8478' : '#d8c9a3';
-        ctx.lineWidth = 1.3;
-        ctx.lineJoin = 'round';
-        ctx.stroke();
-      }
-    }
-
     var left = wing(-1), right = wing(1);
-    var leftZ = (left[0].z + left[2].z) * 0.5;
-    var rightZ = (right[0].z + right[2].z) * 0.5;
+    var leftZ = (left[0].z + left[1].z) * 0.5;
+    var rightZ = (right[0].z + right[1].z) * 0.5;
 
-    if (leftZ < rightZ) paintWing(left);
-    else paintWing(right);
-
-    fillPoly([
-      xf(s * 0.22, 0, -s * 0.05),
-      xf(s * 0.02, -s * 0.08, -s * 0.07),
-      xf(-s * 0.28, 0, -s * 0.04),
-      xf(s * 0.02, s * 0.08, -s * 0.07)
-    ], '#7a7468', alpha * 0.75);
+    if (leftZ < rightZ) fillPoly(left, alpha);
+    else fillPoly(right, alpha);
 
     fillPoly([
-      xf(s * 0.58, 0, s * 0.03),
-      xf(s * 0.08, s * 0.11, s * 0.05),
-      xf(-s * 0.42, 0, s * 0.03),
-      xf(s * 0.08, -s * 0.11, s * 0.05)
-    ], '#e8dcc0', alpha);
+      xf(s * 0.38, 0, 0),
+      xf(-s * 0.22, s * 0.04, 0),
+      xf(-s * 0.22, -s * 0.04, 0)
+    ], alpha);
 
-    fillPoly([
-      xf(-s * 0.30, 0, s * 0.02),
-      xf(-s * 0.62, -s * 0.13, 0),
-      xf(-s * 0.50, 0, -s * 0.02),
-      xf(-s * 0.62, s * 0.13, 0)
-    ], '#c8bb9a', alpha * 0.92);
-
-    fillPoly([
-      xf(s * 0.42, 0, s * 0.07),
-      xf(s * 0.58, -s * 0.05, s * 0.02),
-      xf(s * 0.72, 0, 0),
-      xf(s * 0.58, s * 0.05, s * 0.02)
-    ], '#f0e6ce', alpha);
-
-    if (leftZ < rightZ) paintWing(right);
-    else paintWing(left);
+    if (leftZ < rightZ) fillPoly(right, alpha);
+    else fillPoly(left, alpha);
   }
 
   function drawGlyphs() {
@@ -461,11 +437,10 @@
 
     for (i = 0; i < order.length; i++) {
       var b = birds[order[i]];
-      var trailA = (mode === 'race' ? 0.18 : 0.08) * (0.55 + (b.z + 1) * 0.22);
 
-      if (b.trail.length > 5) {
+      if (mode === 'race' && b.trail.length > 5) {
         ctx.save();
-        ctx.strokeStyle = 'rgba(216, 201, 163, ' + trailA + ')';
+        ctx.strokeStyle = 'rgba(216, 201, 163, 0.14)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(b.trail[0], b.trail[1]);
@@ -522,6 +497,14 @@
       if (m === mode) return;
       mode = m || 'idle';
       modeSince = t;
+      if (mode === 'gather' && birds[0]) {
+        gatherDir = birds[0].vx >= 0 ? 1 : -1;
+        var cruise = gatherDir > 0 ? -0.04 : Math.PI + 0.04;
+        var sp = Math.max(1.4, Math.hypot(birds[0].vx, birds[0].vy));
+        birds[0].vx = Math.cos(cruise) * sp;
+        birds[0].vy = Math.sin(cruise) * sp;
+        birds[0].heading = cruise;
+      }
     },
     setHeroFade: function (v) {
       heroFade = Math.max(0, Math.min(1, v));
