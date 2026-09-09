@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aaron</title>
+<meta name="description" content="Aaron — engineer. A short story in chapters.">
+<meta name="theme-color" content="#0c0c0e">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Aaron">
+<meta property="og:description" content="Aaron — engineer. A short story in chapters.">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230c0c0e'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%23e8e4dc' text-anchor='middle'%3Ea%3C/text%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=Jost:wght@200;300;400&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+
+<!-- ambient layers ------------------------------------------------------- -->
+<canvas id="scene" aria-hidden="true"></canvas>
+<canvas id="flock" aria-hidden="true"></canvas>
+
+<!-- header --------------------------------------------------------------- -->
+<header class="masthead">
+  <nav class="nav" aria-label="Sections">
+    <a class="nav-word" href="#top" data-nav="top">aaron</a>
+    <a class="nav-word" href="#story" data-nav="story">story</a>
+    <span class="rail" id="rail" aria-hidden="true"></span>
+    <a class="nav-word" href="#contact" data-nav="contact">contact</a>
+  </nav>
+</header>
+
+<main>
+
+  <!-- hero --------------------------------------------------------------- -->
+  <section class="hero" id="top" data-chapter="top">
+    <div class="wrap">
+      <h1 class="hero-name">aaron</h1>
+      <!-- EDIT ME: your one-line thesis. The three <b class="cue"> words drive
+           the flock animation. Keep three of them, rename them to whatever you
+           like, and keep the data-cue values (gather / race / ring). -->
+      <p class="hero-line reveal">
+        I build software for people, not for demos. The parts I care about are
+        the ones that have to stay <b class="cue" data-cue="gather" tabindex="0" role="button" aria-label="clear: gathers the flock into a V">clear</b>,
+        <b class="cue" data-cue="race" tabindex="0" role="button" aria-label="quick: sends the flock racing">quick</b>, and
+        <b class="cue" data-cue="ring" tabindex="0" role="button" aria-label="honest: rings the flock around the letter">honest</b>
+        while everything around them grows.
+      </p>
+    </div>
+    <span class="scroll-hint" id="scrollHint">scroll</span>
+  </section>
+
+  <!-- story -------------------------------------------------------------- -->
+  <div id="story"></div>
+
+  <!-- EDIT ME ------------------------------------------------------------
+       Each <section class="chapter"> is one beat of your story.
+       Add or remove them freely: the header rail, the scroll progress and the
+       wireframe scene all count the chapters at runtime, so nothing else
+       needs updating. Keep them newest-first.
+  --------------------------------------------------------------------- -->
+
+  <section class="chapter" data-chapter="c1">
+    <div class="wrap">
+      <p class="year reveal">2024 &ndash; now</p>
+      <h2 class="reveal">Replace this with the work you are proudest of.</h2>
+      <p class="body reveal">
+        Two or three sentences, plainly written. What the system was, what it
+        had to survive, and the one thing you learned that you would not have
+        learned anywhere else. Concrete beats grand.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter" data-chapter="c2">
+    <div class="wrap">
+      <p class="year reveal">2021 &ndash; 2024</p>
+      <h2 class="reveal">A chapter about scale.</h2>
+      <p class="body reveal">
+        Describe the job nobody notices when it works. Name the constraint that
+        made it hard, not the org chart. If a number tells the story better than
+        an adjective, use the number.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter" data-chapter="c3">
+    <div class="wrap">
+      <p class="year reveal">2019 &ndash; 2021</p>
+      <h2 class="reveal">A chapter about starting something.</h2>
+      <p class="body reveal">
+        The prototype, the pitch, the first customer who said no. What you built,
+        what you cut, and how you decided which was which.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter" data-chapter="c4">
+    <div class="wrap">
+      <p class="year reveal">2016 &ndash; 2019</p>
+      <h2 class="reveal">A chapter about craft.</h2>
+      <p class="body reveal">
+        The stretch where you got noticeably better at something. Say what you
+        could do at the end of it that you could not do at the start.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter" data-chapter="c5">
+    <div class="wrap">
+      <p class="year reveal">2013 &ndash; 2016</p>
+      <h2 class="reveal">A chapter about a team.</h2>
+      <p class="body reveal">
+        The moment being the only person who understood a system stopped being
+        flattering and started being a risk. What you did about it.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter" data-chapter="c6">
+    <div class="wrap">
+      <p class="year reveal">2010 &ndash; 2013</p>
+      <h2 class="reveal">A chapter about the early years.</h2>
+      <p class="body reveal">
+        Where you started, however unglamorous. Firmware, spreadsheets, support
+        tickets, whatever it was. This is usually the most interesting chapter.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter" data-chapter="c7">
+    <div class="wrap">
+      <p class="year reveal">before</p>
+      <h2 class="reveal">A chapter about why any of this.</h2>
+      <p class="body reveal">
+        The thing you were doing before it was a job. Close the loop back to the
+        first line on the page.
+      </p>
+    </div>
+  </section>
+
+  <!-- contact ------------------------------------------------------------ -->
+  <section class="chapter contact" id="contact" data-chapter="contact">
+    <div class="wrap">
+      <p class="year reveal">contact</p>
+      <p class="body reveal">
+        The address below is turned thirteen places. Click, and it turns back.
+      </p>
+      <p class="links reveal">
+        <!-- EDIT ME: your email, rotated 13 places (a→n, b→o, …).
+             Run: node -e "console.log(process.argv[1].replace(/[a-z]/gi,c=>String.fromCharCode((c<='Z'?90:122)>=c.charCodeAt(0)+13?c.charCodeAt(0)+13:c.charCodeAt(0)-13)))" you@example.com -->
+        <button class="cipher" id="cipher" data-rot="nneballvc@tznvy.pbz">nneballvc@tznvy.pbz</button>
+      </p>
+      <p class="links reveal">
+        <!-- EDIT ME: your profiles -->
+        <a href="https://github.com/aaronyy" rel="me">github</a>
+        <a href="https://www.linkedin.com/" rel="me">linkedin</a>
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<script src="assets/js/flock.js"></script>
+<script src="assets/js/scene.js"></script>
+<script src="assets/js/site.js"></script>
+</body>
+</html>

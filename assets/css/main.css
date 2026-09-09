@@ -1,0 +1,333 @@
+/* ---------------------------------------------------------------- tokens */
+:root {
+  --bg:        #0c0c0e;
+  --ink:       #e8e4dc;
+  --ink-soft:  #b9b4aa;
+  --ink-mute:  #6f6c66;
+  --ink-faint: #43413d;
+  --gold:      #d8c9a3;
+
+  --sans:  "Jost", "Helvetica Neue", Arial, sans-serif;
+  --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+
+  --gutter: max(6vw, 2rem);
+  --ease:   cubic-bezier(.22, .61, .36, 1);
+}
+
+/* ----------------------------------------------------------------- reset */
+* { box-sizing: border-box; }
+
+html {
+  background: var(--bg);
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* subtle vignette so the canvases never touch the edges hard */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: radial-gradient(130% 100% at 50% 45%, transparent 68%, rgba(0,0,0,.38) 100%);
+}
+
+/* ---------------------------------------------------------------- canvas */
+#scene, #flock {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: block;
+}
+#scene { z-index: 1; }
+#flock { z-index: 2; }
+
+/* ---------------------------------------------------------------- layout */
+main { position: relative; z-index: 4; }
+
+.wrap {
+  width: min(34rem, 100%);
+  margin-left: var(--gutter);
+  padding-right: 1.5rem;
+}
+
+.hero,
+.chapter {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* on wide screens the copy sits left, the wireframe scene lives right */
+@media (min-width: 62rem) {
+  .wrap { width: min(30rem, 44vw); }
+}
+
+/* narrow screens have no side room, so the glyph letter takes the upper third
+   and the hero copy drops to the bottom rather than sitting on top of it */
+@media (max-width: 55rem) {
+  .hero {
+    justify-content: flex-end;
+    padding-bottom: 22vh;
+  }
+}
+
+/* ------------------------------------------------------------------ hero */
+.hero-name {
+  margin: 0 0 1.6rem;
+  font-family: var(--sans);
+  font-weight: 200;
+  font-size: clamp(4rem, 11vw, 8.5rem);
+  line-height: .9;
+  letter-spacing: .06em;
+  color: var(--ink);
+}
+
+.hero-line {
+  margin: 0;
+  max-width: 26rem;
+  font-weight: 300;
+  font-size: clamp(1.05rem, 1.6vw, 1.32rem);
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+/* the three animation cues */
+.cue {
+  font-weight: 400;
+  color: var(--ink);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  border-bottom: 1px solid var(--ink-faint);
+  transition: color .35s var(--ease), border-color .35s var(--ease);
+}
+.cue:hover,
+.cue:focus-visible,
+.cue.live {
+  color: var(--gold);
+  border-color: var(--gold);
+  outline: none;
+}
+
+.scroll-hint {
+  position: absolute;
+  left: var(--gutter);
+  bottom: 2.4rem;
+  font-family: var(--sans);
+  font-weight: 300;
+  font-size: .62rem;
+  letter-spacing: .34em;
+  text-transform: lowercase;
+  color: var(--ink-faint);
+  transition: opacity .6s var(--ease);
+}
+.scroll-hint.gone { opacity: 0; }
+
+/* -------------------------------------------------------------- chapters */
+.year {
+  margin: 0 0 1.1rem;
+  font-family: var(--sans);
+  font-weight: 300;
+  font-size: .64rem;
+  letter-spacing: .32em;
+  color: var(--ink-mute);
+}
+
+.chapter h2 {
+  margin: 0 0 1.5rem;
+  font-weight: 300;
+  font-size: clamp(2rem, 4.4vw, 3.1rem);
+  line-height: 1.06;
+  letter-spacing: -.005em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.body {
+  margin: 0;
+  font-weight: 400;
+  font-size: clamp(1rem, 1.35vw, 1.15rem);
+  line-height: 1.62;
+  color: var(--ink-soft);
+}
+
+/* --------------------------------------------------------------- contact */
+.contact { min-height: 90svh; }
+
+.links {
+  margin: 1.6rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.4rem;
+  font-family: var(--sans);
+  font-weight: 300;
+  font-size: .78rem;
+  letter-spacing: .16em;
+}
+
+.links a,
+.cipher {
+  color: var(--ink-mute);
+  text-decoration: none;
+  font: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: color .35s var(--ease), border-color .35s var(--ease);
+}
+.links a:hover,
+.links a:focus-visible,
+.cipher:hover,
+.cipher:focus-visible {
+  color: var(--gold);
+  border-color: var(--ink-faint);
+  outline: none;
+}
+
+/* the per-character flip when the cipher unrolls */
+.cipher .ch {
+  display: inline-block;
+  transition: transform .5s var(--ease), opacity .5s var(--ease);
+}
+.cipher.turning .ch {
+  transform: rotateX(180deg);
+  opacity: .25;
+}
+.cipher.done { color: var(--ink); }
+
+/* -------------------------------------------------------------- masthead */
+.masthead {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 5;
+  padding: 1.9rem var(--gutter);
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  pointer-events: auto;
+}
+
+.nav-word {
+  font-family: var(--sans);
+  font-weight: 300;
+  font-size: .72rem;
+  letter-spacing: .26em;
+  color: var(--ink-mute);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding-bottom: .25rem;
+  transition: color .35s var(--ease), border-color .35s var(--ease);
+}
+.nav-word:hover,
+.nav-word.active {
+  color: var(--ink);
+  border-color: var(--ink-faint);
+}
+
+/* chapter rail: one tick per chapter, with a bird marker riding along */
+.rail {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  height: 1rem;
+  opacity: 0;
+  transition: opacity .5s var(--ease);
+}
+.rail.on { opacity: 1; }
+
+.rail .tick {
+  width: .75rem;
+  height: 1px;
+  background: var(--ink-faint);
+  transition: background-color .35s var(--ease);
+}
+.rail .tick.past { background: var(--ink-mute); }
+.rail .tick.here { background: var(--gold); }
+
+.rail .marker {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: .6rem;
+  height: .6rem;
+  margin-top: -.3rem;
+  color: var(--gold);
+  transition: transform .5s var(--ease);
+}
+.rail .marker svg { display: block; width: 100%; height: 100%; }
+
+@media (max-width: 44rem) {
+  .rail { display: none; }
+  .nav { gap: 1.1rem; }
+}
+
+/* --------------------------------------------------------------- reveals */
+.reveal {
+  opacity: 0;
+  transform: translateY(1.1rem);
+  filter: blur(6px);
+  transition:
+    opacity   .95s var(--ease),
+    transform .95s var(--ease),
+    filter    .95s var(--ease);
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+  filter: blur(0);
+}
+
+/* stagger the children of a chapter */
+.wrap .reveal:nth-child(1) { transition-delay: 0ms; }
+.wrap .reveal:nth-child(2) { transition-delay: 110ms; }
+.wrap .reveal:nth-child(3) { transition-delay: 220ms; }
+.wrap .reveal:nth-child(4) { transition-delay: 330ms; }
+
+/* ------------------------------------------------------- accessibility */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+  #scene, #flock { display: none; }
+  .scroll-hint { display: none; }
+  .rail .marker { transition: none; }
+}
+
+::selection {
+  background: var(--gold);
+  color: var(--bg);
+}
