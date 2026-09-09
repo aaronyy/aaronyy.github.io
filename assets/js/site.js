@@ -209,7 +209,7 @@
         cipher.title = 'click again to send mail';
         if (cipherHint) {
           cipherHint.textContent =
-            'The address has turned back. Click again, and it writes.';
+            'And there you go. You found me. Say hello.';
         }
       }, 380);
     });
