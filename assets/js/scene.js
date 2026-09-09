@@ -12,7 +12,9 @@
    -1.3 .. 1.3 stays inside the frame. `tone` is 0 for the cool structural
    lines and 1 for the warm accent that carries whatever is moving; glyphs also
    take 2 for the cool blue that speckles a drifting field. A scene may set
-   `gain` to lift its ink when it sits farther from the camera than the globe.
+   `gain` to lift its ink when it sits farther from the camera than the globe,
+   and `paper` to draw structural lines in the page's off-white instead of the
+   cool grey.
 
      g.line(x1,y1,z1, x2,y2,z2, a, tone)
      g.path(flatPts, a, tone, close)
@@ -59,7 +61,7 @@
   /* --------------------------------------------------- camera + ink state */
 
   /* Set once per scene per frame, then read by every call the scene makes. */
-  var vAlpha = 1, vScale = 1, vDist = CAMERA;
+  var vAlpha = 1, vScale = 1, vDist = CAMERA, vPaper = false;
   var cosY = 1, sinY = 0, cosX = 1, sinX = 0;
 
   var pa = { x: 0, y: 0, k: 1 };
@@ -86,14 +88,18 @@
   }
 
   /* Depth does the shading: nothing is lit, near lines are simply less faint.
-     The warm tone rides a little brighter because it is always the subject. */
+     The warm tone rides a little brighter because it is always the subject.
+     Paper scenes (the mill) use the page ink so they do not sink into the black. */
   function inkFor(k, a, tone) {
-    var v = (0.06 + Math.max(0, k - 0.68) * 0.34) * a * vAlpha;
+    var floor = vPaper && !tone ? 0.18 : 0.06;
+    var slope = vPaper && !tone ? 0.5 : 0.34;
+    var v = (floor + Math.max(0, k - 0.68) * slope) * a * vAlpha;
     if (tone) v *= 1.35;
     if (v <= 0.004) return null;
-    if (v > 0.9) v = 0.9;
-    return tone
-      ? 'rgba(216, 201, 163, ' + v.toFixed(3) + ')'
+    if (v > 0.92) v = 0.92;
+    if (tone) return 'rgba(216, 201, 163, ' + v.toFixed(3) + ')';
+    return vPaper
+      ? 'rgba(232, 228, 220, ' + v.toFixed(3) + ')'
       : 'rgba(150, 160, 190, ' + v.toFixed(3) + ')';
   }
 
@@ -152,7 +158,9 @@
       if (v <= 0.002) return;
       ctx.fillStyle = tone
         ? 'rgba(216, 201, 163, ' + v.toFixed(3) + ')'
-        : 'rgba(150, 160, 190, ' + v.toFixed(3) + ')';
+        : vPaper
+          ? 'rgba(232, 228, 220, ' + v.toFixed(3) + ')'
+          : 'rgba(150, 160, 190, ' + v.toFixed(3) + ')';
       ctx.beginPath();
       ctx.moveTo(buf[0], buf[1]);
       for (i = 1; i < n; i++) ctx.lineTo(buf[i * 2], buf[i * 2 + 1]);
@@ -166,7 +174,7 @@
       var v = Math.max(0, Math.min(1, (pa.k - 0.7) * 1.6)) * 0.55 * a * vAlpha;
       if (v <= 0.004) return;
       ctx.globalAlpha = Math.min(1, v);
-      ctx.fillStyle = tone ? '#d8c9a3' : '#93a0bb';
+      ctx.fillStyle = tone ? '#d8c9a3' : vPaper ? '#e8e4dc' : '#93a0bb';
       ctx.beginPath();
       ctx.arc(pa.x, pa.y, Math.max(0.6, 1.15 * pa.k * (size || 1)), 0, Math.PI * 2);
       ctx.fill();
@@ -179,7 +187,7 @@
       var v = a * vAlpha * Math.min(1, pa.k * 0.75);
       if (v <= 0.006) return;
       ctx.globalAlpha = Math.min(1, v);
-      ctx.fillStyle = tone === 1 ? '#d8c9a3' : tone === 2 ? '#93a0bb' : '#b9b2a2';
+      ctx.fillStyle = tone === 1 ? '#d8c9a3' : tone === 2 ? '#93a0bb' : vPaper ? '#e8e4dc' : '#b9b2a2';
       ctx.font = '400 ' + Math.max(3.5, radius * (size || 0.055) * pa.k).toFixed(1) + 'px "Jost", monospace';
       ctx.fillText(ch, pa.x, pa.y);
       ctx.globalAlpha = 1;
@@ -207,8 +215,9 @@
     vDist = CAMERA * (s.dolly || 1);
     vScale = (s.scale || 1) * scale;
     vAlpha = alpha * (s.gain || 1);
+    vPaper = !!s.paper;
 
-    ctx.lineWidth = 1;
+    ctx.lineWidth = vPaper ? 1.35 : 1;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     s.draw(g, sec);

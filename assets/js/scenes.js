@@ -13,6 +13,7 @@
      scale       size multiplier over the shared scene radius
      dolly       camera distance multiplier
      gain        ink multiplier when a scene sits farther from the camera
+     paper       structural lines in the page off-white instead of cool grey
      draw(g, sec)     sec counts from the moment the chapter came on screen
 
    Coordinates are in units of the scene radius: +y is down, +z is toward the
@@ -885,7 +886,7 @@
      pass until there is a carpet, then starts over. */
   function mill(seed) {
     var rnd = mulberry32(seed);
-    var GY = 0.55;
+    var GY = 0.28;
     var RIDGES = [-1.15, -0.92, -0.7, -0.48, -0.26];
     var SMOKE = ['.', ':', '~', '^', 'o', '-'];
     var PICKS = 20, PICK = 0.44, WEAVE = PICKS * PICK + 3.4;
@@ -911,9 +912,9 @@
     }
 
     return {
-      spin: 0.055, yaw: 0.18, swing: 0.26, swingRate: 0.09,
-      tilt: -0.38, sway: 0.09, swayRate: 0.07,
-      scale: 1.28, gain: 2.4,
+      spin: 0.05, yaw: 0.22, swing: 0.18, swingRate: 0.08,
+      tilt: -0.44, sway: 0.07, swayRate: 0.07,
+      scale: 1.58, dolly: 0.68, gain: 1.85, paper: true,
       draw: function (g, sec) {
         var drift = sec * 0.055;
         var j, k, x;
