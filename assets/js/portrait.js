@@ -18,6 +18,10 @@
    progress drives the trip between them, with a per-particle delay so the
    likeness gathers rather than snapping into place.
 
+   Eyes are found as a pair of dark local minima in the upper face, then drawn
+   on top so they are not lost in the stipple. They blink, and they look toward
+   the pointer (or toward the copy, when the pointer has been still).
+
    Public API
      Portrait.setProgress(0..1)
 --------------------------------------------------------------------------- */
@@ -37,14 +41,22 @@
   var t = 0, last = 0;
 
   var points = [];
+  var eyes = null;             // [{tx, ty}, {tx, ty}] in the same units as particles
   var SAMPLE_H = 300;          // sampling resolution, in px of the offscreen buffer
   var BUST_ASPECT = 0.86;      // only used by the drawn stand-in
   var MAX_POINTS = 5200;
   var STEP = 2;                // grid stride when sampling
 
+  var pointerX = 0, pointerY = 0, hasPointer = false;
+  var lookX = 0, lookY = 0;    // smoothed gaze, -1 .. 1
+  var blinkAt = 180;           // frame when the next blink starts
+  var blinkT = -999;           // frame when the current blink started
+
   /* ------------------------------------------------------------- helpers */
 
   function rand(a, b) { return a + Math.random() * (b - a); }
+
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
 
   function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
 
@@ -98,6 +110,15 @@
     c.fillStyle = g;
     c.fillRect(0, 0, w, h);
     c.globalCompositeOperation = 'source-over';
+
+    /* two dark marks so the sampler can find a pair of eyes on the stand-in */
+    c.fillStyle = '#1a1612';
+    c.beginPath();
+    c.ellipse(w * 0.445, h * 0.288, w * 0.024, h * 0.011, 0, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.ellipse(w * 0.555, h * 0.288, w * 0.024, h * 0.011, 0, 0, Math.PI * 2);
+    c.fill();
   }
 
   /* ------------------------------------------------------- subject masking */
@@ -130,6 +151,213 @@
     return bg;
   }
 
+  /* --------------------------------------------------------------- eyes */
+
+  /* Typical placement inside a bust: a little above the midpoint of the
+     subject box, spaced by a sixth of its width. Used when the photo does
+     not give a clean pair of dark minima. */
+  function fallbackEyes(minx, maxx, miny, maxy, bw, bh) {
+    var mx = (minx + maxx) / 2;
+    var fw = maxx - minx, fh = maxy - miny;
+    var ey = miny + fh * 0.28;
+    var sep = fw * 0.16;
+    return [
+      { tx: (mx - sep / 2 - bw / 2) / bh, ty: (ey - bh / 2) / bh },
+      { tx: (mx + sep / 2 - bw / 2) / bh, ty: (ey - bh / 2) / bh }
+    ];
+  }
+
+  /* Eyes are the two darkest compact spots in the upper face, a plausible
+     interpupillary distance apart and nearly level. Hair at the sides is
+     kept out by cropping to the middle of the subject box. */
+  function findEyes(lum, subject, bw, bh) {
+    var minx = bw, maxx = 0, miny = bh, maxy = 0;
+    var x, y, i, k;
+
+    for (y = 0; y < bh; y++) {
+      for (x = 0; x < bw; x++) {
+        if (!subject[y * bw + x]) continue;
+        if (x < minx) minx = x;
+        if (x > maxx) maxx = x;
+        if (y < miny) miny = y;
+        if (y > maxy) maxy = y;
+      }
+    }
+    if (maxx <= minx) return null;
+
+    var fw = maxx - minx, fh = maxy - miny;
+    var x0 = (minx + fw * 0.26) | 0;
+    var x1 = (minx + fw * 0.74) | 0;
+    var y0 = (miny + fh * 0.20) | 0;
+    var y1 = (miny + fh * 0.42) | 0;
+
+    var mins = [];
+    for (y = y0 + 2; y < y1 - 2; y++) {
+      for (x = x0 + 2; x < x1 - 2; x++) {
+        i = y * bw + x;
+        if (!subject[i]) continue;
+        var L = lum[i];
+        if (L > 0.24) continue;
+        var darker = 0, n = 0, dx, dy;
+        for (dy = -2; dy <= 2; dy++) {
+          for (dx = -2; dx <= 2; dx++) {
+            if (!dx && !dy) continue;
+            var j = (y + dy) * bw + (x + dx);
+            if (!subject[j]) continue;
+            n++;
+            if (L <= lum[j]) darker++;
+          }
+        }
+        if (n >= 8 && darker >= n * 0.72) mins.push({ L: L, x: x, y: y });
+      }
+    }
+
+    if (mins.length < 2) return fallbackEyes(minx, maxx, miny, maxy, bw, bh);
+    mins.sort(function (a, b) { return a.L - b.L; });
+
+    var a = mins[0], b = null;
+    for (k = 1; k < mins.length; k++) {
+      var adx = Math.abs(mins[k].x - a.x);
+      var ady = Math.abs(mins[k].y - a.y);
+      if (adx < fw * 0.10 || adx > fw * 0.32) continue;
+      if (ady > fh * 0.07) continue;
+      b = mins[k];
+      break;
+    }
+    if (!b) return fallbackEyes(minx, maxx, miny, maxy, bw, bh);
+    if (a.x > b.x) { var tmp = a; a = b; b = tmp; }
+
+    return [
+      { tx: (a.x - bw / 2) / bh, ty: (a.y - bh / 2) / bh },
+      { tx: (b.x - bw / 2) / bh, ty: (b.y - bh / 2) / bh }
+    ];
+  }
+
+  function inEye(tx, ty, pair) {
+    var ipd = Math.hypot(pair[1].tx - pair[0].tx, pair[1].ty - pair[0].ty);
+    var rx = ipd * 0.30, ry = rx * 0.58;
+    for (var i = 0; i < 2; i++) {
+      var dx = (tx - pair[i].tx) / rx;
+      var dy = (ty - pair[i].ty) / ry;
+      if (dx * dx + dy * dy < 1.2) return true;
+    }
+    return false;
+  }
+
+  /* 1 = open. A blink is a 10-frame dip through closed. */
+  function lidOpen() {
+    var u = t - blinkT;
+    if (u < 0 || u > 10) return 1;
+    var p = u / 10;
+    return Math.abs(p - 0.5) * 2;
+  }
+
+  function updateGaze() {
+    if (!eyes) return;
+
+    var mx, my;
+    if (hasPointer) {
+      mx = pointerX;
+      my = pointerY;
+    } else {
+      /* rest looking toward the copy, which sits to the left on a wide screen */
+      mx = W >= 880 ? W * 0.28 : W * 0.5;
+      my = H * 0.48;
+    }
+
+    var ex = cx + (eyes[0].tx + eyes[1].tx) * 0.5 * scale;
+    var ey = cy + (eyes[0].ty + eyes[1].ty) * 0.5 * scale;
+    var dx = mx - ex, dy = my - ey;
+    var mag = Math.hypot(dx, dy) || 1;
+    var reach = Math.min(1, mag / (scale * 0.55));
+    var tx = (dx / mag) * reach;
+    var ty = (dy / mag) * reach;
+
+    lookX += (tx - lookX) * 0.08;
+    lookY += (ty - lookY) * 0.08;
+  }
+
+  function drawEye(ex, ey, rx, ry, tilt, gx, gy, open, alpha) {
+    ctx.save();
+    ctx.translate(ex, ey);
+    ctx.rotate(tilt);
+    ctx.globalAlpha = alpha;
+
+    if (open < 0.14) {
+      ctx.strokeStyle = '#8a8478';
+      ctx.lineWidth = Math.max(1.1, rx * 0.13);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-rx * 0.92, 0);
+      ctx.quadraticCurveTo(0, rx * 0.1, rx * 0.92, 0);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
+    ctx.save();
+    ctx.scale(1, Math.max(0.16, open));
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    ctx.clip();
+
+    /* almost no white of the eye — the photo is dark iris in a narrow lid */
+    ctx.fillStyle = '#6a6358';
+    ctx.fillRect(-rx - 1, -ry - 1, rx * 2 + 2, ry * 2 + 2);
+
+    var ix = gx * rx * 0.22;
+    var iy = gy * ry * 0.28;
+    var ir = rx * 0.98;
+    ctx.fillStyle = '#2a241c';
+    ctx.beginPath();
+    ctx.arc(ix, iy, ir, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#0e0c0a';
+    ctx.beginPath();
+    ctx.arc(ix, iy, ir * 0.48, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#e8e4dc';
+    ctx.beginPath();
+    ctx.arc(ix - ir * 0.28, iy - ir * 0.30, Math.max(0.7, ir * 0.14), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#d8c9a3';
+    ctx.beginPath();
+    ctx.arc(ix + ir * 0.18, iy + ir * 0.16, Math.max(0.4, ir * 0.055), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    /* hooded lid: a heavier upper stroke so they read as smiling, not round */
+    ctx.strokeStyle = 'rgba(12,12,14,0.72)';
+    ctx.lineWidth = Math.max(1.2, rx * 0.22);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-rx * 0.96, ry * open * 0.05);
+    ctx.quadraticCurveTo(0, -ry * open * 1.05, rx * 0.96, ry * open * 0.05);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawEyes(appear) {
+    if (!eyes || appear <= 0.01) return;
+
+    var ipd = Math.hypot(eyes[1].tx - eyes[0].tx, eyes[1].ty - eyes[0].ty);
+    var rx = ipd * 0.22 * scale;
+    var ry = rx * 0.34;
+    var tilt = Math.atan2(eyes[1].ty - eyes[0].ty, eyes[1].tx - eyes[0].tx);
+    var open = lidOpen();
+    var i;
+
+    for (i = 0; i < 2; i++) {
+      drawEye(
+        cx + eyes[i].tx * scale,
+        cy + eyes[i].ty * scale,
+        rx, ry, tilt, lookX, lookY, open, appear
+      );
+    }
+  }
+
   /* ------------------------------------------------------------ sampling */
 
   function samplePixels(buffer, bw, bh) {
@@ -154,6 +382,7 @@
       /* Already cut out: alpha is the mask. 128 rather than 0 keeps the
          antialiased rim from becoming a halo of stray particles. */
       for (i = 0; i < n; i++) subject[i] = alpha[i] >= 128 ? 1 : 0;
+      eyes = findEyes(lum, subject, bw, bh);
     } else {
       var edge = 0, edgeN = 0;
       for (x = 0; x < bw; x++) { edge += lum[x] + lum[(bh - 1) * bw + x]; edgeN += 2; }
@@ -162,6 +391,7 @@
 
       var bg = floodBackground(lum, alpha, bw, bh, darkIsDense);
       for (i = 0; i < n; i++) subject[i] = (!bg[i] && alpha[i] >= 24) ? 1 : 0;
+      eyes = findEyes(lum, subject, bw, bh);
 
       /* A dark subject on a light ground wants its tones read the other way
          up, so the emphasis still lands on hair and brows. */
@@ -223,6 +453,10 @@
         drift: rand(0.004, 0.013)
       };
     });
+
+    if (eyes) {
+      points = points.filter(function (q) { return !inEye(q.tx, q.ty, eyes); });
+    }
   }
 
   function buildFrom(image) {
@@ -257,10 +491,18 @@
   function draw(dt) {
     t += dt;
 
+    if (t > blinkAt) {
+      blinkT = t;
+      blinkAt = t + rand(140, 320);
+      /* an occasional double blink */
+      if (Math.random() < 0.18) blinkAt = t + 16;
+    }
+
     ctx.clearRect(0, 0, W, H);
     if (progress <= 0.001 || !points.length) return;
 
     var p = progress;
+    updateGaze();
 
     /* Smaller dots on a phone-sized cloud, so the detail survives the scale
        down without the points blurring into each other. Thinning the set
@@ -290,6 +532,11 @@
       ctx.fillRect(x, y, q.size * dot, q.size * dot);
     }
     ctx.globalAlpha = 1;
+
+    /* Eyes arrive once the face has mostly gathered, so the cloud becomes
+       a person and then looks back. */
+    var appear = easeOutCubic(clamp((p - 0.55) / 0.35, 0, 1));
+    drawEyes(appear * p);
   }
 
   function frame(now) {
@@ -338,6 +585,12 @@
   resize();
   load();
   window.addEventListener('resize', resize);
+
+  window.addEventListener('pointermove', function (e) {
+    pointerX = e.clientX;
+    pointerY = e.clientY;
+    hasPointer = true;
+  }, { passive: true });
 
   document.addEventListener('visibilitychange', function () {
     running = !document.hidden;
