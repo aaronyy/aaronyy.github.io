@@ -14,6 +14,7 @@
      dolly       camera distance multiplier
      gain        ink multiplier when a scene sits farther from the camera
      paper       structural lines in the page off-white instead of cool grey
+     weight      stroke width, for a scene with more detail than the default
      draw(g, sec)     sec counts from the moment the chapter came on screen
 
    Coordinates are in units of the scene radius: +y is down, +z is toward the
@@ -78,6 +79,41 @@
     g.path(pts, a, tone, true);
   }
 
+  /* part of a circle inside a plane frame */
+  function arcIn(g, P, cu, cv, r, a0, a1, a, tone, n) {
+    n = n || 10;
+    var pts = [];
+    for (var i = 0; i <= n; i++) {
+      var th = a0 + (a1 - a0) * (i / n);
+      var p = P(cu + Math.cos(th) * r, cv + Math.sin(th) * r);
+      pts.push(p[0], p[1], p[2]);
+    }
+    g.path(pts, a, tone);
+  }
+
+  /* a polyline authored in a plane's own two coordinates */
+  function polyIn(g, P, uv, a, tone, close) {
+    var pts = [];
+    for (var i = 0; i < uv.length; i += 2) {
+      var p = P(uv[i], uv[i + 1]);
+      pts.push(p[0], p[1], p[2]);
+    }
+    g.path(pts, a, tone, close);
+  }
+
+  /* The rose curve security printing is engraved from: a circle with a set
+     number of lobes. Nested at different counts it reads as guilloche. */
+  function rosette(g, P, cu, cv, r, lobes, amp, a, tone, n) {
+    n = n || 64;
+    var uv = [];
+    for (var i = 0; i < n; i++) {
+      var th = i / n * TAU;
+      var rr = r * (1 + amp * Math.cos(lobes * th));
+      uv.push(cu + Math.cos(th) * rr, cv + Math.sin(th) * rr);
+    }
+    polyIn(g, P, uv, a, tone, true);
+  }
+
   /* a circle lying flat, for light pools and orbit paths */
   function ringY(g, x, y, z, r, a, tone, n) {
     n = n || 24;
@@ -86,6 +122,20 @@
       pts.push(x + Math.cos(i / n * TAU) * r, y, z + Math.sin(i / n * TAU) * r);
     }
     g.path(pts, a, tone, true);
+  }
+
+  /* A drum lying along z: two end rings and a few lines down its length. The
+     beams of a loom, and anything else that has to read as turned. */
+  function drumZ(g, x, y, z0, z1, r, a, tone) {
+    var A = plane([0, 0, z0], [1, 0, 0], [0, 1, 0]);
+    var B = plane([0, 0, z1], [1, 0, 0], [0, 1, 0]);
+    ringIn(g, A, x, y, r, a, tone, 14);
+    ringIn(g, B, x, y, r, a * 0.7, tone, 14);
+    for (var i = 0; i < 4; i++) {
+      var th = i / 4 * TAU + 0.4;
+      var dx = Math.cos(th) * r, dy = Math.sin(th) * r;
+      g.line(x + dx, y + dy, z0, x + dx, y + dy, z1, a * 0.55, tone);
+    }
   }
 
   /* twelve edges, optionally yawed about its own centre */
@@ -106,17 +156,27 @@
     }
   }
 
-  /* a loose sheet of paper: outline plus a few ruled lines */
+  /* A loose sheet of paper: a letterhead block, ruled lines, a seal in the
+     corner and the corner opposite turned up. */
   function sheet(g, x, y, z, yaw, tip, hw, hh, rows, a, tone) {
     var cy = Math.cos(yaw), sy = Math.sin(yaw);
     var ct = Math.cos(tip), st = Math.sin(tip);
     var P = plane([x, y, z], [cy, 0, sy], [-sy * ct, st, cy * ct]);
     panel(g, P, -hw, -hh, hw, hh, a, tone);
+
+    seg(g, P(-hw * 0.72, -hh * 0.74), P(hw * 0.06, -hh * 0.74), a * 0.75, tone);
+    seg(g, P(-hw * 0.72, -hh * 0.62), P(-hw * 0.2, -hh * 0.62), a * 0.45, tone);
+    panel(g, P, hw * 0.3, -hh * 0.84, hw * 0.76, -hh * 0.52, a * 0.4, tone);
+
     for (var i = 0; i < rows; i++) {
-      var v = -hh + (i + 1) * (hh * 2 / (rows + 1));
-      var w = hw * (0.3 + 0.6 * frac(i * 0.37 + hh * 3));
-      seg(g, P(-hw * 0.7, v), P(w, v), a * 0.65, tone);
+      var v = -hh * 0.36 + i * (hh * 1.05 / rows);
+      var w = hw * (0.2 + 0.62 * frac(i * 0.37 + hh * 3));
+      seg(g, P(-hw * 0.72, v), P(w, v), a * 0.55, tone);
     }
+
+    ringIn(g, P, hw * 0.42, hh * 0.66, hw * 0.2, a * 0.5, tone, 12);
+    ringIn(g, P, hw * 0.42, hh * 0.66, hw * 0.11, a * 0.3, tone, 10);
+    seg(g, P(hw * 0.6, hh), P(hw, hh * 0.64), a * 0.55, tone);
   }
 
   /* a point on a rectangle's perimeter, s in 0..1 — the path a robot walks */
@@ -132,20 +192,44 @@
 
   /* ---------------------------------------------- 1 · passport and papers */
 
-  /* An open passport lying on an invisible desk: photograph page on the left,
-     printed fields and a machine-readable strip on the right. A stamp comes
-     down every few seconds and leaves a mark, and loose documents drift up
-     around the book — the paperwork of a country, being processed. */
+  /* An open passport on a desk. The left page is the record: a guilloche
+     rosette under the photograph, a printed line for every fact about you, a
+     signature, a chip. The right page is where the answers land — the visas
+     already granted, and the strip a machine reads along the foot. A stamp
+     comes down every few seconds and leaves a dated mark, and loose documents
+     drift up around the book: the paperwork of a country, being processed. */
   function passport(seed) {
     var rnd = mulberry32(seed);
     var DESK = 0.10;                 // the spine's height, lowest point of the book
     var HALF = 0.42;                 // half the spine's length
     var WIDE = 0.56;                 // spine to fore-edge
+    var LEAVES = 4;                  // page edges showing at the fore-edge
     var STAMP_AT = 6.4;              // seconds between stamps
-    var MRZ = 'p<usa<yip<<aaron<<<<<<<<'.split('');
+    var MRZ = ['p<usa<yip<<aaron<<<<<<<<',
+               'y8842119<3usa9104071m28'];
+    var DATE = '240926'.split('');
 
-    var sheets = [], i;
-    for (i = 0; i < 5; i++) {
+    var i, f;
+
+    /* the signature: jittered once here, then simply reprinted every frame */
+    var sign = [];
+    for (i = 0; i <= 24; i++) {
+      f = i / 24;
+      sign.push(0.085 + f * 0.25,
+                0.336 + Math.sin(f * 9.4) * 0.015 * (1 - f * 0.35) + (rnd() - 0.5) * 0.005);
+    }
+
+    /* visas already in the book, each at whatever angle the officer held it */
+    var granted = [];
+    for (i = 0; i < 3; i++) {
+      granted.push({
+        u: 0.15 + rnd() * 0.24, v: -0.34 + i * 0.13 + rnd() * 0.03,
+        r: 0.058 + rnd() * 0.018, rot: rnd() * TAU, a: 0.24 + rnd() * 0.18
+      });
+    }
+
+    var sheets = [];
+    for (i = 0; i < 6; i++) {
       sheets.push({
         ang: rnd() * TAU,
         rad: 0.74 + rnd() * 0.44,
@@ -153,7 +237,7 @@
         tip: (rnd() - 0.5) * 0.8,
         phase: rnd(),
         speed: 0.03 + rnd() * 0.028,
-        rows: 3 + ((rnd() * 3) | 0)
+        rows: 4 + ((rnd() * 3) | 0)
       });
     }
 
@@ -165,11 +249,29 @@
       });
     }
 
+    /* one mark left by one stamp: two rings, the teeth between them, and the
+       date ruled across the middle */
+    function mark(g, P, cu, cv, r, rot, a, tone) {
+      ringIn(g, P, cu, cv, r, a * 0.95, tone, 18);
+      ringIn(g, P, cu, cv, r * 0.62, a * 0.55, tone, 14);
+      for (var m = 0; m < 12; m++) {
+        var th = rot + m / 12 * TAU;
+        seg(g, P(cu + Math.cos(th) * r * 0.68, cv + Math.sin(th) * r * 0.68),
+               P(cu + Math.cos(th) * r * 0.92, cv + Math.sin(th) * r * 0.92), a * 0.4, tone);
+      }
+      seg(g, P(cu - r * 0.5, cv - r * 0.2), P(cu + r * 0.5, cv - r * 0.2), a * 0.45, tone);
+      seg(g, P(cu - r * 0.5, cv + r * 0.24), P(cu + r * 0.5, cv + r * 0.24), a * 0.45, tone);
+      for (m = 0; m < DATE.length; m++) {
+        var q = P(cu + (m - 2.5) * r * 0.19, cv + r * 0.03);
+        g.glyph(DATE[m], q[0], q[1], q[2], a * 0.75, tone, 0.024);
+      }
+    }
+
     return {
-      spin: 0.1, yaw: 0.35, tilt: -0.52, sway: 0.1, swayRate: 0.08,
-      scale: 1.22, gain: 1.65,
+      spin: 0.1, yaw: 0.35, tilt: -0.74, sway: 0.08, swayRate: 0.08,
+      scale: 1.12, gain: 1.65,
       draw: function (g, sec) {
-        var i;
+        var i, k, v, w, p;
         var open = 0.15 + Math.sin(sec * 0.32) * 0.05;
         var co = Math.cos(open), so = Math.sin(open);
 
@@ -177,37 +279,111 @@
         function page(side, lift) {
           return plane([0, DESK - lift, 0], [side * co, -so, 0], [0, 0, 1]);
         }
-        var L = page(-1, 0.016), R = page(1, 0.016);
+        var L = page(-1, 0.024), R = page(1, 0.024);
 
-        /* covers, then the block of pages sitting on them */
-        panel(g, page(-1, 0), 0.015, -HALF, WIDE, HALF, 1, 0);
-        panel(g, page(1, 0), 0.015, -HALF, WIDE, HALF, 1, 0);
-        panel(g, L, 0.03, -HALF + 0.02, WIDE - 0.03, HALF - 0.02, 0.88, 0);
-        panel(g, R, 0.03, -HALF + 0.02, WIDE - 0.03, HALF - 0.02, 0.88, 0);
+        /* the desk the book is lying on */
+        for (i = -5; i <= 5; i++) {
+          var d0 = i * 0.19, faint = 0.17 * (1 - Math.abs(i) / 6.5);
+          g.line(d0, DESK + 0.003, -0.95, d0, DESK + 0.003, 0.95, faint, 0);
+          g.line(-0.95, DESK + 0.003, d0, 0.95, DESK + 0.003, d0, faint, 0);
+        }
+
+        /* covers, the leaves stacked on them, and the sewn spine */
+        panel(g, page(-1, 0), 0.012, -HALF, WIDE + 0.012, HALF, 1, 0);
+        panel(g, page(1, 0), 0.012, -HALF, WIDE + 0.012, HALF, 1, 0);
+        for (k = 0; k < LEAVES; k++) {
+          var inset = 0.007 + k * 0.0055;
+          var lit = k === LEAVES - 1 ? 0.9 : 0.3;
+          panel(g, page(-1, 0.005 + k * 0.0063), 0.02, -HALF + inset, WIDE - inset, HALF - inset, lit, 0);
+          panel(g, page(1, 0.005 + k * 0.0063), 0.02, -HALF + inset, WIDE - inset, HALF - inset, lit, 0);
+        }
         g.line(0, DESK, -HALF, 0, DESK, HALF, 0.95, 0);
+        for (k = 0; k < 9; k++) {
+          var sv = -HALF + 0.06 + k * (HALF * 2 - 0.12) / 8;
+          g.line(-0.016, DESK - 0.005, sv, 0.016, DESK - 0.005, sv, 0.45, 0);
+        }
 
-        /* left page: the photograph, and the seal under it */
-        panel(g, L, 0.1, -0.34, 0.36, -0.04, 0.95, 0);
-        ringIn(g, L, 0.23, -0.24, 0.045, 0.85, 0, 12);
-        seg(g, L(0.13, -0.06), L(0.23, -0.16), 0.8, 0);
-        seg(g, L(0.33, -0.06), L(0.23, -0.16), 0.8, 0);
-        for (i = 0; i < 3; i++) {
-          seg(g, L(0.1, 0.04 + i * 0.08), L(0.1 + 0.14 + i * 0.06, 0.04 + i * 0.08), 0.8, 0);
-        }
-        ringIn(g, L, 0.44, 0.3, 0.085, 0.75, 0, 16);
-        ringIn(g, L, 0.44, 0.3, 0.055, 0.58, 0, 12);
+        /* a ruled border on each page, and the guilloche printed inside it */
+        panel(g, L, 0.05, -0.375, 0.51, 0.395, 0.5, 0);
+        panel(g, L, 0.062, -0.363, 0.498, 0.383, 0.22, 0);
+        panel(g, R, 0.05, -0.375, 0.51, 0.395, 0.5, 0);
+        panel(g, R, 0.062, -0.363, 0.498, 0.383, 0.22, 0);
 
-        /* right page: fields, then the strip a machine reads */
-        for (i = 0; i < 6; i++) {
-          var w = 0.16 + frac(i * 0.41) * 0.32;
-          seg(g, R(0.08, -0.3 + i * 0.09), R(0.08 + w, -0.3 + i * 0.09), 0.82, 0);
+        rosette(g, L, 0.28, -0.05, 0.24, 9, 0.11, 0.14, 0, 60);
+        rosette(g, L, 0.28, -0.05, 0.185, 13, 0.08, 0.11, 0, 52);
+        rosette(g, L, 0.2, -0.18, 0.148, 7, 0.15, 0.26, 0, 52);
+        rosette(g, L, 0.2, -0.18, 0.112, 11, 0.11, 0.2, 0, 44);
+
+        /* the photograph, ruled over by the line screen it was printed with */
+        panel(g, L, 0.08, -0.33, 0.32, -0.03, 0.95, 0);
+        panel(g, L, 0.094, -0.316, 0.306, -0.044, 0.38, 0);
+        for (k = 0; k < 7; k++) {
+          v = -0.3 + k * 0.038;
+          seg(g, L(0.096, v), L(0.304, v), 0.13, 0);
         }
-        for (i = 0; i < MRZ.length; i++) {
-          var du = 0.06 + (i % 12) * 0.043;
-          var dv = 0.28 + ((i / 12) | 0) * 0.07;
-          var p = R(du, dv);
-          g.glyph(MRZ[i], p[0], p[1], p[2], 0.75, 0, 0.036);
+        ringIn(g, L, 0.2, -0.215, 0.046, 0.85, 0, 16);
+        arcIn(g, L, 0.2, -0.23, 0.056, Math.PI * 1.06, TAU, 0.5, 0, 10);
+        arcIn(g, L, 0.2, -0.045, 0.104, Math.PI, TAU, 0.8, 0, 14);
+        seg(g, L(0.2, -0.169), L(0.2, -0.149), 0.45, 0);
+
+        /* the second, fainter portrait printed beside it */
+        ringIn(g, L, 0.425, -0.245, 0.026, 0.4, 0, 12);
+        arcIn(g, L, 0.425, -0.196, 0.058, Math.PI, TAU, 0.32, 0, 10);
+
+        /* one printed line per fact, each with its label */
+        for (k = 0; k < 8; k++) {
+          v = 0.02 + k * 0.038;
+          seg(g, L(0.07, v), L(0.113, v), 0.32, 0);
+          w = 0.09 + frac(k * 0.47 + 0.2) * 0.15;
+          seg(g, L(0.128, v), L(0.128 + w, v), 0.78, 0);
         }
+
+        /* the signature, and the chip with its aerial printed around it */
+        polyIn(g, L, sign, 0.7, 0);
+        seg(g, L(0.07, 0.372), L(0.44, 0.372), 0.26, 0);
+        panel(g, L, 0.39, 0.05, 0.49, 0.15, 0.65, 0);
+        for (k = 1; k < 4; k++) seg(g, L(0.39, 0.05 + k * 0.025), L(0.49, 0.05 + k * 0.025), 0.3, 0);
+        seg(g, L(0.44, 0.05), L(0.44, 0.15), 0.3, 0);
+        ringIn(g, L, 0.44, 0.1, 0.062, 0.22, 0, 16);
+
+        /* the seal, engraved the same way as the rest of the page */
+        rosette(g, L, 0.42, 0.29, 0.072, 9, 0.16, 0.6, 0, 40);
+        rosette(g, L, 0.42, 0.29, 0.044, 6, 0.2, 0.4, 0, 28);
+
+        /* right page: the wave print, faint under everything else */
+        for (k = 0; k < 11; k++) {
+          var wave = [];
+          for (i = 0; i <= 18; i++) {
+            var t2 = i / 18;
+            wave.push(0.07 + t2 * 0.42,
+                      -0.34 + k * 0.062 + Math.sin(t2 * 7.4 + k * 0.8) * 0.015);
+          }
+          polyIn(g, R, wave, 0.2, 0);
+        }
+
+        /* the visas it has collected, and the number punched down the edge */
+        for (k = 0; k < granted.length; k++) {
+          var gr = granted[k];
+          mark(g, R, gr.u, gr.v, gr.r, gr.rot, gr.a, 0);
+        }
+        for (k = 0; k < 13; k++) {
+          p = R(0.535, -0.32 + k * 0.05);
+          g.dot(p[0], p[1], p[2], 0.45, 0, 0.5);
+        }
+
+        /* the strip a machine reads */
+        panel(g, R, 0.04, 0.26, 0.52, 0.385, 0.4, 0);
+        for (k = 0; k < MRZ.length; k++) {
+          for (i = 0; i < MRZ[k].length; i++) {
+            p = R(0.056 + i * 0.0185, 0.297 + k * 0.05);
+            g.glyph(MRZ[k].charAt(i), p[0], p[1], p[2], 0.7, 0, 0.021);
+          }
+        }
+
+        /* the ink pad, waiting beside the book */
+        var Pad = plane([0.86, DESK - 0.036, -0.36], [1, 0, 0], [0, 0, 1]);
+        box(g, 0.86, DESK - 0.018, -0.36, 0.15, 0.018, 0.11, 0.5, 1);
+        for (k = 0; k < 7; k++) seg(g, Pad(-0.12, -0.08 + k * 0.027), Pad(0.12, -0.08 + k * 0.027), 0.2, 1);
 
         /* the stamp: down, press, up, then wait */
         var u = sec % STAMP_AT;
@@ -215,23 +391,43 @@
                  : u < 1.5 ? 1
                  : u < 2.5 ? 1 - ease((u - 1.5) / 1)
                  : 0;
-        var mark = R(0.34, 0.06);
-        var lift = 0.038 + (1 - down) * 0.46;
-        box(g, mark[0], mark[1] - lift, mark[2], 0.075, 0.035, 0.075, 0.85, 1);
-        g.line(mark[0], mark[1] - lift - 0.035, mark[2],
-               mark[0], mark[1] - lift - 0.16, mark[2], 0.7, 1);
-        box(g, mark[0], mark[1] - lift - 0.19, mark[2], 0.04, 0.03, 0.04, 0.6, 1);
+        var at = R(0.31, 0.11);
+        var hy = at[1] - 0.026 - (1 - down) * 0.44;
+        var th;
+
+        ringY(g, at[0], hy, at[2], 0.092, 0.85, 1, 20);           // the die
+        ringY(g, at[0], hy - 0.042, at[2], 0.092, 0.7, 1, 20);
+        ringY(g, at[0], hy - 0.042, at[2], 0.052, 0.4, 1, 14);
+        for (k = 0; k < 10; k++) {
+          th = k / 10 * TAU;
+          g.line(at[0] + Math.cos(th) * 0.092, hy, at[2] + Math.sin(th) * 0.092,
+                 at[0] + Math.cos(th) * 0.092, hy - 0.042, at[2] + Math.sin(th) * 0.092, 0.45, 1);
+        }
+        var coil = [];                                            // the spring above it
+        for (k = 0; k <= 30; k++) {
+          var cf = k / 30;
+          th = cf * TAU * 3.5;
+          coil.push(at[0] + Math.cos(th) * 0.036, hy - 0.05 - cf * 0.085, at[2] + Math.sin(th) * 0.036);
+        }
+        g.path(coil, 0.4, 1);
+        g.line(at[0], hy - 0.042, at[2], at[0], hy - 0.235, at[2], 0.45, 1);
+        ringY(g, at[0], hy - 0.155, at[2], 0.056, 0.7, 1, 16);     // the knurled handle
+        ringY(g, at[0], hy - 0.215, at[2], 0.056, 0.7, 1, 16);
+        for (k = 0; k < 12; k++) {
+          th = k / 12 * TAU;
+          g.line(at[0] + Math.cos(th) * 0.056, hy - 0.155, at[2] + Math.sin(th) * 0.056,
+                 at[0] + Math.cos(th) * 0.056, hy - 0.215, at[2] + Math.sin(th) * 0.056, 0.3, 1);
+        }
+        ringY(g, at[0], hy - 0.238, at[2], 0.034, 0.5, 1, 12);
 
         /* the impression it leaves, and the ring that spreads from it */
         var age = u - 1.2;
         if (age > 0) {
           var stay = clamp(1 - age / (STAMP_AT - 1.2) * 0.85, 0, 1);
-          ringIn(g, R, 0.34, 0.06, 0.1, stay * 0.9, 1, 16);
-          ringIn(g, R, 0.34, 0.06, 0.066, stay * 0.6, 1, 12);
-          seg(g, R(0.28, 0.06), R(0.4, 0.06), stay * 0.5, 1);
+          mark(g, R, 0.31, 0.11, 0.088, 0.2, stay, 1);
           if (age < 0.9) {
-            var wave = age / 0.9;
-            ringIn(g, R, 0.34, 0.06, 0.1 + wave * 0.28, (1 - wave) * 0.7, 1, 20);
+            var ripple = age / 0.9;
+            ringIn(g, R, 0.31, 0.11, 0.092 + ripple * 0.26, (1 - ripple) * 0.7, 1, 20);
           }
         }
 
@@ -247,9 +443,9 @@
         }
 
         for (i = 0; i < dust.length; i++) {
-          var d = dust[i];
-          g.glyph(d.ch, d.x, d.y + Math.sin(sec * 0.4 + d.drift) * 0.05, d.z,
-                  d.a, i % 6 === 0 ? 2 : 0, 0.04);
+          var dt = dust[i];
+          g.glyph(dt.ch, dt.x, dt.y + Math.sin(sec * 0.4 + dt.drift) * 0.05, dt.z,
+                  dt.a, i % 6 === 0 ? 2 : 0, 0.04);
         }
       }
     };
@@ -580,7 +776,7 @@
     for (var i = 0; i < 26; i++) {
       motes.push({
         x: (rnd() - 0.5) * 1.7, y: FY - rnd() * 1.0, z: (rnd() - 0.5) * 1.5,
-        ch: pick(rnd), drift: rnd() * TAU, a: 0.14 + rnd() * 0.3
+        ch: pick(rnd), drift: rnd() * TAU, a: 0.08 + rnd() * 0.18
       });
     }
 
@@ -637,31 +833,31 @@
 
     return {
       yaw: 0.42, swing: 0.5, swingRate: 0.14, tilt: -0.4, sway: 0.07,
-      swayRate: 0.09, scale: 1.02,
+      swayRate: 0.09, scale: 1.02, gain: 2.1,
       draw: function (g, sec) {
         var j;
 
         /* floor */
         for (j = -4; j <= 4; j++) {
           var f = j / 4;
-          g.line(LEFT, FY, f * NEAR, RIGHT, FY, f * NEAR, 0.3, 0);
-          g.line(f * RIGHT, FY, BACK, f * RIGHT, FY, NEAR, 0.3, 0);
+          g.line(LEFT, FY, f * NEAR, RIGHT, FY, f * NEAR, 0.5, 0);
+          g.line(f * RIGHT, FY, BACK, f * RIGHT, FY, NEAR, 0.5, 0);
         }
 
         /* the two walls that make the corner, and the window in one of them */
         var B = plane([0, 0, BACK], [1, 0, 0], [0, 1, 0]);
-        panel(g, B, LEFT, FY, RIGHT, CEIL, 0.7, 0);
-        panel(g, B, -0.05, -0.12, 0.55, -0.42, 0.85, 0);
-        seg(g, B(0.25, -0.12), B(0.25, -0.42), 0.6, 0);
-        seg(g, B(-0.05, -0.27), B(0.55, -0.27), 0.6, 0);
+        panel(g, B, LEFT, FY, RIGHT, CEIL, 0.85, 0);
+        panel(g, B, -0.05, -0.12, 0.55, -0.42, 1, 0);
+        seg(g, B(0.25, -0.12), B(0.25, -0.42), 0.75, 0);
+        seg(g, B(-0.05, -0.27), B(0.55, -0.27), 0.75, 0);
 
         var Lw = plane([LEFT, 0, 0], [0, 0, 1], [0, 1, 0]);
-        panel(g, Lw, BACK, FY, NEAR, CEIL, 0.55, 0);
-        seg(g, Lw(BACK, -0.08), Lw(NEAR, -0.08), 0.3, 0);
+        panel(g, Lw, BACK, FY, NEAR, CEIL, 0.7, 0);
+        seg(g, Lw(BACK, -0.08), Lw(NEAR, -0.08), 0.4, 0);
 
         /* daylight landing on the floor */
         g.fill([-0.05, -0.12, BACK, 0.55, -0.12, BACK,
-                0.75, FY, BACK + 0.75, 0.15, FY, BACK + 0.75], 1, 1);
+                0.75, FY, BACK + 0.75, 0.15, FY, BACK + 0.75], 0.42, 1);
 
         /* the plans, dissolving one into the next */
         var span = HOLD + TURN;
@@ -880,19 +1076,23 @@
 
   /* ---------------------------------------------- 6 · mill and countryside */
 
-  /* Rolling ground that scrolls past, a mill with a sawtooth roof and a
-     chimney, poles marching off into the distance — and in front of it all a
-     loom, where a shuttle runs back and forth and lays down one thread per
-     pass until there is a carpet, then starts over. */
+  /* Rolling ground that scrolls past: a hedgerow, bare trees, poles marching
+     off into the distance, and a mill with a sawtooth roof and a tapered
+     chimney. In front of it all a loom — warp beam, two heddle shafts lifting
+     a shed, a reed that beats each pick home, a shuttle running back and
+     forth — laying down one thread per pass until there is a carpet with a
+     pattern in it, then starting over. */
   function mill(seed) {
     var rnd = mulberry32(seed);
     var GY = 0.28;
-    var RIDGES = [-1.15, -0.92, -0.7, -0.48, -0.26];
+    var RIDGES = [-1.34, -1.16, -0.99, -0.83, -0.68, -0.54, -0.41, -0.29];
     var SMOKE = ['.', ':', '~', '^', 'o', '-'];
-    var PICKS = 20, PICK = 0.44, WEAVE = PICKS * PICK + 3.4;
+    var PICKS = 24, PICK = 0.4, WEAVE = PICKS * PICK + 3.4;
+    var WARPS = 15;                  // threads across the carpet
+    var DENTS = 21;                  // slots in the reed the warp runs through
 
-    /* Two sines and a slow swell, so the ground rolls rather than ripples. The
-       ridge nearest the mill is flattened into the pad it stands on. */
+    /* Three sines, so the ground rolls rather than ripples. The ridge nearest
+       the mill is flattened into the pad it stands on. */
     function land(x, z) {
       var pad = clamp((z + 0.2) * 2.4, 0, 1);
       return GY - (1 - pad) * (0.15 * Math.sin(x * 1.35 + z * 0.5)
@@ -900,8 +1100,40 @@
                              + 0.04 * Math.sin(x * 6.4 - z));
     }
 
-    var poles = [];
-    for (var i = 0; i < 5; i++) poles.push(i * 0.62);
+    var poles = [], i;
+    for (i = 0; i < 6; i++) poles.push(i * 0.62);
+
+    /* Bare trees, grown once here and then only carried past by the drift. A
+       branch splits in two, each child tilted off its parent at its own angle
+       around it, so the tree holds up from any side the camera swings to. */
+    function limbs() {
+      var out = [];
+      function grow(p, d, len, depth) {
+        var q = [p[0] + d[0] * len, p[1] + d[1] * len, p[2] + d[2] * len];
+        out.push({ a: p, b: q, w: 0.72 - depth * 0.16 });
+        if (depth >= 3) return;
+        var s = Math.abs(d[0]) < 0.9 ? [1, 0, 0] : [0, 0, 1];
+        var e1 = [d[1] * s[2] - d[2] * s[1], d[2] * s[0] - d[0] * s[2], d[0] * s[1] - d[1] * s[0]];
+        var m = Math.hypot(e1[0], e1[1], e1[2]) || 1;
+        e1 = [e1[0] / m, e1[1] / m, e1[2] / m];
+        var e2 = [d[1] * e1[2] - d[2] * e1[1], d[2] * e1[0] - d[0] * e1[2], d[0] * e1[1] - d[1] * e1[0]];
+        for (var c = 0; c < 2; c++) {
+          var az = rnd() * TAU, sp = 0.38 + rnd() * 0.34;
+          var cs = Math.cos(sp), sn = Math.sin(sp);
+          var ca = Math.cos(az) * sn, sa = Math.sin(az) * sn;
+          grow(q, [d[0] * cs + e1[0] * ca + e2[0] * sa,
+                   d[1] * cs + e1[1] * ca + e2[1] * sa,
+                   d[2] * cs + e1[2] * ca + e2[2] * sa], len * 0.66, depth + 1);
+        }
+      }
+      grow([0, 0, 0], [0, -1, 0], 0.13, 0);
+      return out;
+    }
+
+    var trees = [];
+    for (i = 0; i < 3; i++) {
+      trees.push({ at: i * 1.05 + rnd() * 0.3, z: -1.12 + rnd() * 0.18, limbs: limbs() });
+    }
 
     var motes = [];
     for (i = 0; i < 20; i++) {
@@ -914,72 +1146,150 @@
     return {
       spin: 0.05, yaw: 0.22, swing: 0.18, swingRate: 0.08,
       tilt: -0.44, sway: 0.07, swayRate: 0.07,
-      scale: 1.58, dolly: 0.68, gain: 1.85, paper: true,
+      scale: 1.42, dolly: 0.68, gain: 1.85, paper: true, weight: 1.1,
       draw: function (g, sec) {
         var drift = sec * 0.055;
-        var j, k, x;
+        var j, k, x, f;
 
-        /* the ground, as ridges at a few depths with a sparse mesh between */
+        /* anything standing in the field is carried past at the same rate */
+        function walk(at, span) { return -1.4 + frac((at + drift * 0.9) / span) * span; }
+        function edgeAt(px) { return clamp((1.35 - Math.abs(px)) * 2.2, 0, 1); }
+
+        /* the ground, as ridges at eight depths with a mesh knitting them */
         for (j = 0; j < RIDGES.length; j++) {
           var z = RIDGES[j];
           var pts = [];
-          for (k = 0; k <= 20; k++) {
-            x = -1.25 + k * 0.125;
+          for (k = 0; k <= 28; k++) {
+            x = -1.3 + k * 0.0929;
             pts.push(x, land(x + drift, z), z);
           }
-          g.path(pts, 0.55 + j * 0.12, 0);
+          g.path(pts, 0.34 + j * 0.055, 0);
 
           if (j) {
             var pz = RIDGES[j - 1];
-            for (k = 0; k <= 20; k += 4) {
-              x = -1.25 + k * 0.125;
-              g.line(x, land(x + drift, pz), pz, x, land(x + drift, z), z, 0.42, 0);
+            for (k = 0; k <= 28; k += 3) {
+              x = -1.3 + k * 0.0929;
+              g.line(x, land(x + drift, pz), pz, x, land(x + drift, z), z, 0.2, 0);
             }
           }
         }
 
-        /* poles walking past, with the cable sagging between them */
+        /* the hedgerow: posts with two rails run between them */
+        var HZ = -0.55, prev = null;
+        for (j = 0; j < 15; j++) {
+          var hx = walk(j * 0.21, 3.15);
+          var hb = land(hx + drift, HZ), ha = edgeAt(hx);
+          g.line(hx, hb, HZ, hx, hb - 0.09, HZ, 0.4 * ha, 0);
+          if (prev && hx > prev[0]) {
+            g.line(prev[0], prev[1] - 0.075, HZ, hx, hb - 0.075, HZ, 0.28 * ha, 0);
+            g.line(prev[0], prev[1] - 0.04, HZ, hx, hb - 0.04, HZ, 0.22 * ha, 0);
+          }
+          prev = [hx, hb];
+        }
+
+        /* bare trees on the far side */
+        for (j = 0; j < trees.length; j++) {
+          var tr = trees[j];
+          var tx = walk(tr.at, 3.15), ta = edgeAt(tx);
+          if (ta <= 0.01) continue;
+          var ty = land(tx + drift, tr.z);
+          for (k = 0; k < tr.limbs.length; k++) {
+            var lb = tr.limbs[k];
+            g.line(tx + lb.a[0], ty + lb.a[1], tr.z + lb.a[2],
+                   tx + lb.b[0], ty + lb.b[1], tr.z + lb.b[2], lb.w * ta, 0);
+          }
+        }
+
+        /* poles walking past, crossarms and all, cable sagging between them */
         for (j = 0; j < poles.length; j++) {
-          var px = -1.35 + frac((poles[j] + drift * 0.9) / 3.1) * 3.1;
-          if (px > 1.35) continue;
-          var pz = -0.78;
-          var base = land(px + drift, pz);
-          var top = base - 0.3;
-          var edge = clamp((1.3 - Math.abs(px)) * 2.2, 0, 1);
-          g.line(px, base, pz, px, top, pz, 0.6 * edge, 0);
-          g.line(px - 0.05, top + 0.04, pz, px + 0.05, top + 0.04, pz, 0.5 * edge, 0);
+          var px = walk(poles[j], 3.1);
+          var ppz = -0.86;
+          var base = land(px + drift, ppz);
+          var top = base - 0.32;
+          var pa = edgeAt(px);
+          g.line(px, base, ppz, px, top, ppz, 0.55 * pa, 0);
+          g.line(px - 0.055, top + 0.035, ppz, px + 0.055, top + 0.035, ppz, 0.45 * pa, 0);
+          g.line(px - 0.04, top + 0.09, ppz, px + 0.04, top + 0.09, ppz, 0.32 * pa, 0);
+          g.line(px - 0.03, top + 0.035, ppz, px, top + 0.075, ppz, 0.25 * pa, 0);
+          g.line(px + 0.03, top + 0.035, ppz, px, top + 0.075, ppz, 0.25 * pa, 0);
+          for (k = -1; k <= 1; k += 2) {
+            g.dot(px + k * 0.055, top + 0.025, ppz, 0.5 * pa, 0, 0.7);
+          }
           var nx = px + 0.62;
-          if (nx < 1.35) {
-            var ntop = land(nx + drift, pz) - 0.3;
-            var cable = [];
-            for (k = 0; k <= 4; k++) {
-              var f = k / 4;
-              cable.push(px + (nx - px) * f,
-                         top + (ntop - top) * f + Math.sin(f * Math.PI) * 0.035, pz);
+          if (nx < 1.4) {
+            var ntop = land(nx + drift, ppz) - 0.32;
+            for (var c = -1; c <= 1; c += 2) {
+              var cable = [];
+              for (k = 0; k <= 5; k++) {
+                f = k / 5;
+                cable.push(px + c * 0.055 + (nx - px) * f,
+                           top + 0.035 + (ntop - top) * f + Math.sin(f * Math.PI) * 0.032, ppz);
+              }
+              g.path(cable, 0.22 * pa, 0);
             }
-            g.path(cable, 0.3 * edge, 0);
           }
         }
 
-        /* the mill: hall, sawtooth roof, chimney, and a row of windows */
-        var MX = -0.46, MZ = -0.02, MY = GY - 0.02;
-        box(g, MX, MY - 0.13, MZ, 0.3, 0.13, 0.2, 1, 0);
-        for (k = 0; k < 4; k++) {
-          var x0 = MX - 0.3 + k * 0.15;
-          for (j = -1; j <= 1; j += 2) {
-            var zf = MZ + j * 0.2;
-            g.line(x0, MY - 0.26, zf, x0 + 0.075, MY - 0.35, zf, 0.85, 0);
-            g.line(x0 + 0.075, MY - 0.35, zf, x0 + 0.15, MY - 0.26, zf, 0.85, 0);
-          }
-          g.line(x0 + 0.075, MY - 0.35, MZ - 0.2, x0 + 0.075, MY - 0.35, MZ + 0.2, 0.7, 0);
-        }
-        var CHX = MX + 0.22, CHZ = MZ - 0.1, CHTOP = MY - 0.62;
-        box(g, CHX, MY - 0.36, CHZ, 0.035, 0.26, 0.035, 0.9, 0);
+        /* the mill: brick hall, sawtooth roof, tapered chimney, windows */
+        var MX = -0.5, MZ = -0.06, MY = GY - 0.02;
+        var W0 = MX - 0.34, W1 = MX + 0.34, ZB = MZ - 0.22, ZF = MZ + 0.22;
+        var EAVE = MY - 0.28;
+        var Fr = plane([0, 0, ZF], [1, 0, 0], [0, 1, 0]);
+        var Bk = plane([0, 0, ZB], [1, 0, 0], [0, 1, 0]);
 
-        var Fr = plane([0, 0, MZ + 0.2], [1, 0, 0], [0, 1, 0]);
-        for (k = 0; k < 5; k++) {
-          var wx = MX - 0.24 + k * 0.12;
-          panel(g, Fr, wx, MY - 0.09, wx + 0.07, MY - 0.19, 0.7, 0);
+        box(g, MX, (MY + EAVE) / 2, MZ, 0.34, (MY - EAVE) / 2, 0.22, 0.9, 0);
+        for (k = 1; k < 8; k++) {                            // brick courses
+          var by = MY - k * 0.035;
+          seg(g, Fr(W0, by), Fr(W1, by), 0.16, 0);
+        }
+        for (k = 0; k <= 6; k++) {                           // pilasters
+          x = W0 + k * (W1 - W0) / 6;
+          seg(g, Fr(x, MY), Fr(x, EAVE), 0.22, 0);
+        }
+        seg(g, Fr(W0, MY - 0.022), Fr(W1, MY - 0.022), 0.4, 0);
+        for (k = 0; k < 5; k++) {                            // windows, four panes each
+          var wx = MX - 0.27 + k * 0.135;
+          panel(g, Fr, wx, MY - 0.085, wx + 0.075, MY - 0.2, 0.6, 0);
+          seg(g, Fr(wx + 0.0375, MY - 0.085), Fr(wx + 0.0375, MY - 0.2), 0.32, 0);
+          seg(g, Fr(wx, MY - 0.1425), Fr(wx + 0.075, MY - 0.1425), 0.32, 0);
+        }
+        panel(g, Fr, MX + 0.24, MY, MX + 0.31, MY - 0.13, 0.55, 0);   // the door
+        seg(g, Fr(MX + 0.23, MY + 0.012), Fr(MX + 0.32, MY + 0.012), 0.4, 0);
+
+        for (k = 0; k < 5; k++) {                            // the sawtooth bays
+          var v0 = W0 + k * 0.136, v1 = v0 + 0.136;
+          var rid = EAVE - 0.088;
+          seg(g, Fr(v0, EAVE), Fr(v0, rid), 0.6, 0);         // the glazed north light
+          seg(g, Fr(v0, rid), Fr(v1, EAVE), 0.75, 0);
+          seg(g, Bk(v0, EAVE), Bk(v0, rid), 0.4, 0);
+          seg(g, Bk(v0, rid), Bk(v1, EAVE), 0.5, 0);
+          g.line(v0, rid, ZB, v0, rid, ZF, 0.55, 0);         // ridge
+          g.line(v1, EAVE, ZB, v1, EAVE, ZF, 0.4, 0);        // valley
+          for (j = 1; j < 4; j++) {                          // glazing bars
+            var gz = ZB + (ZF - ZB) * (j / 4);
+            g.line(v0, EAVE, gz, v0, rid, gz, 0.2, 0);
+            g.line(v0 + 0.045, rid - 0.029, gz, v0 + 0.091, rid - 0.058, gz, 0.14, 0);
+          }
+        }
+
+        var CHX = MX + 0.2, CHZ = MZ - 0.12, CHTOP = MY - 0.68;
+        for (k = 0; k < 4; k++) {                            // the chimney, tapering
+          var sx = (k & 1) ? 1 : -1, sz = (k & 2) ? 1 : -1;
+          g.line(CHX + sx * 0.042, MY, CHZ + sz * 0.042,
+                 CHX + sx * 0.026, CHTOP, CHZ + sz * 0.026, 0.75, 0);
+        }
+        for (k = 0; k <= 5; k++) {                           // its banding
+          f = k / 5;
+          var cy2 = MY + (CHTOP - MY) * f, cr = 0.042 - 0.016 * f;
+          if (k === 5) cr = 0.05;
+          ringY(g, CHX, cy2, CHZ, cr * 1.34, 0.35 + (k === 5 ? 0.3 : 0), 0, 4);
+        }
+        g.line(CHX + 0.05, MY, CHZ, CHX + 0.034, CHTOP + 0.02, CHZ, 0.3, 0);
+        g.line(CHX + 0.066, MY, CHZ, CHX + 0.05, CHTOP + 0.02, CHZ, 0.3, 0);
+        for (k = 0; k < 9; k++) {                            // the ladder up its side
+          f = k / 9;
+          var ly2 = MY + (CHTOP + 0.02 - MY) * f;
+          g.line(CHX + 0.05 - 0.016 * f, ly2, CHZ, CHX + 0.066 - 0.016 * f, ly2, CHZ, 0.24, 0);
         }
 
         /* smoke, drifting off with the wind */
@@ -994,34 +1304,122 @@
                   puff * 0.5, 0, 0.045 + p * 0.03);
         }
 
-        /* the loom: warp threads, then one weft thread per pass of the shuttle */
-        var X0 = 0.1, X1 = 0.92, Z0 = 0.18, Z1 = 0.72;
-        var LY = GY - 0.015;
+        /* ------------------------------------------------------- the loom */
+
+        var X0 = 0.04, X1 = 0.74, Z0 = 0.06, Z1 = 0.5;
+        var XF = X0 + (X1 - X0) * 0.58;    // as far as the cloth ever reaches
+        var LY = GY - 0.14;                // the plane the cloth lies in
+        var TOPY = LY - 0.2;               // the castle the shafts hang from
         var u = sec % WEAVE;
         var done = clamp(Math.floor(u / PICK), 0, PICKS);
+        var into = frac(u / PICK);
         var cloth = u > PICKS * PICK + 1.9 ? 1 - (u - PICKS * PICK - 1.9) / 1.5 : 1;
         cloth = clamp(cloth, 0, 1);
 
-        for (k = 0; k <= 6; k++) {
-          var wz = Z0 + (Z1 - Z0) * (k / 6);
-          g.line(X0 - 0.04, LY, wz, X1 + 0.04, LY, wz, 0.72, 0);
+        /* the floor it stands on */
+        for (k = 0; k <= 8; k++) {
+          var fz = Z0 - 0.14 + (Z1 - Z0 + 0.28) * (k / 8);
+          g.line(X0 - 0.16, GY, fz, X1 + 0.16, GY, fz, 0.16, 0);
         }
+
+        /* the frame: four legs, the breast rails, and the castle over the top */
+        var CX = [X0 - 0.05, X1 + 0.05], CZ = [Z0 - 0.05, Z1 + 0.05];
+        for (j = 0; j < 2; j++) {
+          for (k = 0; k < 2; k++) {
+            g.line(CX[j], GY, CZ[k], CX[j], TOPY, CZ[k], 0.62, 0);
+          }
+          g.line(CX[j], LY + 0.02, CZ[0], CX[j], LY + 0.02, CZ[1], 0.5, 0);
+          g.line(CX[j], TOPY, CZ[0], CX[j], TOPY, CZ[1], 0.45, 0);
+          g.line(CX[0], LY + 0.02, CZ[j], CX[1], LY + 0.02, CZ[j], 0.45, 0);
+          g.line(CX[0], TOPY, CZ[j], CX[1], TOPY, CZ[j], 0.4, 0);
+          g.line(CX[j], GY - 0.04, CZ[0], CX[j], GY - 0.04, CZ[1], 0.3, 0);
+        }
+
+        /* warp beam at the back, cloth beam at the front */
+        drumZ(g, X1 + 0.05, LY - 0.05, CZ[0], CZ[1], 0.042, 0.55, 0);
+        drumZ(g, X0 - 0.05, LY + 0.025, CZ[0], CZ[1], 0.038, 0.55, 0);
+
+        /* Where the weaving has got to, and the two shafts just behind it: one
+           lifts while the other drops, which is what opens the shed. */
+        var fell = X0 + (XF - X0) * (done / PICKS);
+        var lift = (done % 2 ? 1 : -1) * 0.022;
+        var HX = [fell + 0.115, fell + 0.19];
+
+        for (j = 0; j < 2; j++) {
+          var sy2 = LY - 0.09 + (j ? -lift : lift);
+          for (k = 0; k < 2; k++) {
+            g.line(HX[j], sy2 - 0.042, CZ[k], HX[j], sy2 + 0.042, CZ[k], 0.35, 0);
+          }
+          g.line(HX[j], sy2 - 0.042, CZ[0], HX[j], sy2 - 0.042, CZ[1], 0.5, 0);
+          g.line(HX[j], sy2 + 0.042, CZ[0], HX[j], sy2 + 0.042, CZ[1], 0.5, 0);
+          for (k = j; k < WARPS; k += 2) {                   // one heddle per thread
+            var hz = Z0 + (Z1 - Z0) * (k / (WARPS - 1));
+            g.line(HX[j], sy2 - 0.042, hz, HX[j], sy2 + 0.042, hz, 0.2, 0);
+          }
+          g.line(HX[j], sy2 - 0.042, (Z0 + Z1) / 2, HX[j], TOPY, (Z0 + Z1) / 2, 0.22, 0);
+          g.line(HX[j], sy2 + 0.042, CZ[0] + 0.02, X0 + 0.1, GY - 0.045 - (j ? -lift : lift) * 1.6, CZ[0] + 0.02, 0.16, 0);
+        }
+
+        /* the warp: flat off the beam, then split into the shed at the fell */
+        for (k = 0; k < WARPS; k++) {
+          var wz2 = Z0 + (Z1 - Z0) * (k / (WARPS - 1));
+          var side = (k % 2 ? 1 : -1) * lift;
+          g.line(X1 + 0.05, LY - 0.05, wz2, HX[1], LY - 0.09, wz2, 0.3, 0);
+          g.line(HX[1], LY - 0.09 + side, wz2, HX[0], LY - 0.09 + side, wz2, 0.34, 0);
+          g.line(HX[0], LY - 0.09 + side, wz2, fell, LY, wz2, 0.42, 0);
+          if (done) g.line(X0, LY, wz2, fell, LY, wz2, 0.5 * cloth, 0);
+        }
+
+        /* The reed: it hangs back while the shuttle flies, then swings forward
+           and beats the new thread up against the cloth. */
+        var beat = into > 0.72 ? pulse((into - 0.72) / 0.28) : 0;
+        var bx = fell + 0.062 - beat * 0.065;
+        for (k = 0; k < DENTS; k++) {
+          var dz = Z0 - 0.02 + (Z1 - Z0 + 0.04) * (k / (DENTS - 1));
+          g.line(bx, LY - 0.062, dz, bx, LY + 0.005, dz, 0.22, 0);
+        }
+        g.line(bx, LY - 0.062, CZ[0], bx, LY - 0.062, CZ[1], 0.5, 0);
+        g.line(bx, LY + 0.005, CZ[0], bx, LY + 0.005, CZ[1], 0.5, 0);
+        for (k = 0; k < 2; k++) {
+          g.line(bx, LY - 0.062, CZ[k], HX[1] + 0.05, TOPY, CZ[k], 0.3, 0);
+        }
+
+        /* the cloth: one weft thread per pass, with the pattern coming up in it */
         for (k = 0; k < done; k++) {
-          var kx = X0 + (X1 - X0) * (k / PICKS);
-          g.line(kx, LY, Z0, kx, LY, Z1, 0.88 * cloth, 0);
+          var kx = X0 + (XF - X0) * (k / PICKS);
+          g.line(kx, LY, Z0, kx, LY, Z1, 0.5 * cloth, 0);
+          var motif = Math.abs((k % 8) - 3.5) / 3.5;         // a diamond, repeating
+          var half = (Z1 - Z0) * 0.42 * (1 - motif);
+          if (half > 0.01) {
+            var mid = (Z0 + Z1) / 2;
+            g.line(kx, LY - 0.004, mid - half, kx, LY - 0.004, mid + half, 0.85 * cloth, 1);
+          }
         }
+        g.line(X0, LY, Z0, fell, LY, Z0, 0.6 * cloth, 0);
+        g.line(X0, LY, Z1, fell, LY, Z1, 0.6 * cloth, 0);
+        for (k = 0; k <= 3; k++) {                           // rolling onto the beam
+          var rz = Z0 + (Z1 - Z0) * (k / 3);
+          var roll = [];
+          for (j = 0; j <= 5; j++) {
+            f = j / 5;
+            roll.push(X0 - Math.sin(f * 1.9) * 0.062, LY + (1 - Math.cos(f * 1.9)) * 0.05, rz);
+          }
+          g.path(roll, 0.35 * cloth, 0);
+        }
+
+        /* the shuttle, and the thread paying out behind it */
         if (done < PICKS) {
-          var sx = X0 + (X1 - X0) * (done / PICKS);
-          var f2 = frac(u / PICK);
           var back = done % 2 === 1;
-          var sz = Z0 + (Z1 - Z0) * (back ? 1 - f2 : f2);
-          box(g, sx, LY - 0.022, sz, 0.022, 0.02, 0.05, 1, 1);
-          g.line(sx, LY - 0.01, back ? Z1 : Z0, sx, LY - 0.01, sz, 0.85, 1);
-          g.dot(sx, LY - 0.02, sz, 1.4, 1, 1.4);
+          var run = clamp(into / 0.72, 0, 1);
+          var sz2 = Z0 - 0.04 + (Z1 - Z0 + 0.08) * (back ? 1 - run : run);
+          var Sh = plane([fell + 0.025, LY - 0.025, 0], [1, 0, 0], [0, 0, 1]);
+          polyIn(g, Sh, [0, sz2 - 0.05, 0.017, sz2 - 0.018, 0.017, sz2 + 0.018,
+                         0, sz2 + 0.05, -0.017, sz2 + 0.018, -0.017, sz2 - 0.018], 1, 1, true);
+          ringIn(g, Sh, 0, sz2, 0.012, 0.6, 1, 10);
+          g.line(fell + 0.025, LY - 0.025, back ? Z1 + 0.04 : Z0 - 0.04,
+                 fell + 0.025, LY - 0.025, sz2, 0.7, 1);
+          g.dot(fell + 0.025, LY - 0.025, sz2, 1.3, 1, 1.3);
         }
-        g.line(X0, LY, Z0, X0, LY, Z1, 0.78 * cloth, 0);
-        g.line(X0 + (X1 - X0) * (done / PICKS), LY, Z0,
-               X0 + (X1 - X0) * (done / PICKS), LY, Z1, 0.78 * cloth, 0);
 
         for (j = 0; j < motes.length; j++) {
           var m = motes[j];

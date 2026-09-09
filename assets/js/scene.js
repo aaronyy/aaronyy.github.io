@@ -13,8 +13,8 @@
    lines and 1 for the warm accent that carries whatever is moving; glyphs also
    take 2 for the cool blue that speckles a drifting field. A scene may set
    `gain` to lift its ink when it sits farther from the camera than the globe,
-   and `paper` to draw structural lines in the page's off-white instead of the
-   cool grey.
+   `paper` to draw structural lines in the page's off-white instead of the cool
+   grey, and `weight` to override the stroke width a busy scene is drawn at.
 
      g.line(x1,y1,z1, x2,y2,z2, a, tone)
      g.path(flatPts, a, tone, close)
@@ -217,7 +217,7 @@
     vAlpha = alpha * (s.gain || 1);
     vPaper = !!s.paper;
 
-    ctx.lineWidth = vPaper ? 1.35 : 1;
+    ctx.lineWidth = s.weight || (vPaper ? 1.35 : 1);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     s.draw(g, sec);
