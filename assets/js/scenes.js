@@ -12,6 +12,7 @@
      sway, swayRate   how far and how fast the pitch drifts
      scale       size multiplier over the shared scene radius
      dolly       camera distance multiplier
+     gain        ink multiplier when a scene sits farther from the camera
      draw(g, sec)     sec counts from the moment the chapter came on screen
 
    Coordinates are in units of the scene radius: +y is down, +z is toward the
@@ -136,7 +137,7 @@
      around the book — the paperwork of a country, being processed. */
   function passport(seed) {
     var rnd = mulberry32(seed);
-    var DESK = 0.30;                 // the spine's height, lowest point of the book
+    var DESK = 0.10;                 // the spine's height, lowest point of the book
     var HALF = 0.42;                 // half the spine's length
     var WIDE = 0.56;                 // spine to fore-edge
     var STAMP_AT = 6.4;              // seconds between stamps
@@ -165,7 +166,7 @@
 
     return {
       spin: 0.1, yaw: 0.35, tilt: -0.52, sway: 0.1, swayRate: 0.08,
-      scale: 1.12,
+      scale: 1.22, gain: 1.65,
       draw: function (g, sec) {
         var i;
         var open = 0.15 + Math.sin(sec * 0.32) * 0.05;
@@ -178,33 +179,33 @@
         var L = page(-1, 0.016), R = page(1, 0.016);
 
         /* covers, then the block of pages sitting on them */
-        panel(g, page(-1, 0), 0.015, -HALF, WIDE, HALF, 0.9, 0);
-        panel(g, page(1, 0), 0.015, -HALF, WIDE, HALF, 0.9, 0);
-        panel(g, L, 0.03, -HALF + 0.02, WIDE - 0.03, HALF - 0.02, 0.55, 0);
-        panel(g, R, 0.03, -HALF + 0.02, WIDE - 0.03, HALF - 0.02, 0.55, 0);
-        g.line(0, DESK, -HALF, 0, DESK, HALF, 0.8, 0);
+        panel(g, page(-1, 0), 0.015, -HALF, WIDE, HALF, 1, 0);
+        panel(g, page(1, 0), 0.015, -HALF, WIDE, HALF, 1, 0);
+        panel(g, L, 0.03, -HALF + 0.02, WIDE - 0.03, HALF - 0.02, 0.88, 0);
+        panel(g, R, 0.03, -HALF + 0.02, WIDE - 0.03, HALF - 0.02, 0.88, 0);
+        g.line(0, DESK, -HALF, 0, DESK, HALF, 0.95, 0);
 
         /* left page: the photograph, and the seal under it */
-        panel(g, L, 0.1, -0.34, 0.36, -0.04, 0.85, 0);
-        ringIn(g, L, 0.23, -0.24, 0.045, 0.7, 0, 12);
-        seg(g, L(0.13, -0.06), L(0.23, -0.16), 0.6, 0);
-        seg(g, L(0.33, -0.06), L(0.23, -0.16), 0.6, 0);
+        panel(g, L, 0.1, -0.34, 0.36, -0.04, 0.95, 0);
+        ringIn(g, L, 0.23, -0.24, 0.045, 0.85, 0, 12);
+        seg(g, L(0.13, -0.06), L(0.23, -0.16), 0.8, 0);
+        seg(g, L(0.33, -0.06), L(0.23, -0.16), 0.8, 0);
         for (i = 0; i < 3; i++) {
-          seg(g, L(0.1, 0.04 + i * 0.08), L(0.1 + 0.14 + i * 0.06, 0.04 + i * 0.08), 0.6, 0);
+          seg(g, L(0.1, 0.04 + i * 0.08), L(0.1 + 0.14 + i * 0.06, 0.04 + i * 0.08), 0.8, 0);
         }
-        ringIn(g, L, 0.44, 0.3, 0.085, 0.55, 0, 16);
-        ringIn(g, L, 0.44, 0.3, 0.055, 0.4, 0, 12);
+        ringIn(g, L, 0.44, 0.3, 0.085, 0.75, 0, 16);
+        ringIn(g, L, 0.44, 0.3, 0.055, 0.58, 0, 12);
 
         /* right page: fields, then the strip a machine reads */
         for (i = 0; i < 6; i++) {
           var w = 0.16 + frac(i * 0.41) * 0.32;
-          seg(g, R(0.08, -0.3 + i * 0.09), R(0.08 + w, -0.3 + i * 0.09), 0.62, 0);
+          seg(g, R(0.08, -0.3 + i * 0.09), R(0.08 + w, -0.3 + i * 0.09), 0.82, 0);
         }
         for (i = 0; i < MRZ.length; i++) {
           var du = 0.06 + (i % 12) * 0.043;
           var dv = 0.28 + ((i / 12) | 0) * 0.07;
           var p = R(du, dv);
-          g.glyph(MRZ[i], p[0], p[1], p[2], 0.5, 0, 0.036);
+          g.glyph(MRZ[i], p[0], p[1], p[2], 0.75, 0, 0.036);
         }
 
         /* the stamp: down, press, up, then wait */
@@ -884,7 +885,7 @@
      pass until there is a carpet, then starts over. */
   function mill(seed) {
     var rnd = mulberry32(seed);
-    var GY = 0.8;
+    var GY = 0.55;
     var RIDGES = [-1.15, -0.92, -0.7, -0.48, -0.26];
     var SMOKE = ['.', ':', '~', '^', 'o', '-'];
     var PICKS = 20, PICK = 0.44, WEAVE = PICKS * PICK + 3.4;
@@ -911,7 +912,8 @@
 
     return {
       spin: 0.055, yaw: 0.18, swing: 0.26, swingRate: 0.09,
-      tilt: -0.3, sway: 0.09, swayRate: 0.07,
+      tilt: -0.38, sway: 0.09, swayRate: 0.07,
+      scale: 1.28, gain: 2.4,
       draw: function (g, sec) {
         var drift = sec * 0.055;
         var j, k, x;
@@ -924,13 +926,13 @@
             x = -1.25 + k * 0.125;
             pts.push(x, land(x + drift, z), z);
           }
-          g.path(pts, 0.4 + j * 0.13, 0);
+          g.path(pts, 0.55 + j * 0.12, 0);
 
           if (j) {
             var pz = RIDGES[j - 1];
             for (k = 0; k <= 20; k += 4) {
               x = -1.25 + k * 0.125;
-              g.line(x, land(x + drift, pz), pz, x, land(x + drift, z), z, 0.22, 0);
+              g.line(x, land(x + drift, pz), pz, x, land(x + drift, z), z, 0.42, 0);
             }
           }
         }
@@ -960,23 +962,23 @@
 
         /* the mill: hall, sawtooth roof, chimney, and a row of windows */
         var MX = -0.46, MZ = -0.02, MY = GY - 0.02;
-        box(g, MX, MY - 0.13, MZ, 0.3, 0.13, 0.2, 0.85, 0);
+        box(g, MX, MY - 0.13, MZ, 0.3, 0.13, 0.2, 1, 0);
         for (k = 0; k < 4; k++) {
           var x0 = MX - 0.3 + k * 0.15;
           for (j = -1; j <= 1; j += 2) {
             var zf = MZ + j * 0.2;
-            g.line(x0, MY - 0.26, zf, x0 + 0.075, MY - 0.35, zf, 0.7, 0);
-            g.line(x0 + 0.075, MY - 0.35, zf, x0 + 0.15, MY - 0.26, zf, 0.7, 0);
+            g.line(x0, MY - 0.26, zf, x0 + 0.075, MY - 0.35, zf, 0.85, 0);
+            g.line(x0 + 0.075, MY - 0.35, zf, x0 + 0.15, MY - 0.26, zf, 0.85, 0);
           }
-          g.line(x0 + 0.075, MY - 0.35, MZ - 0.2, x0 + 0.075, MY - 0.35, MZ + 0.2, 0.55, 0);
+          g.line(x0 + 0.075, MY - 0.35, MZ - 0.2, x0 + 0.075, MY - 0.35, MZ + 0.2, 0.7, 0);
         }
         var CHX = MX + 0.22, CHZ = MZ - 0.1, CHTOP = MY - 0.62;
-        box(g, CHX, MY - 0.36, CHZ, 0.035, 0.26, 0.035, 0.75, 0);
+        box(g, CHX, MY - 0.36, CHZ, 0.035, 0.26, 0.035, 0.9, 0);
 
         var Fr = plane([0, 0, MZ + 0.2], [1, 0, 0], [0, 1, 0]);
         for (k = 0; k < 5; k++) {
           var wx = MX - 0.24 + k * 0.12;
-          panel(g, Fr, wx, MY - 0.09, wx + 0.07, MY - 0.19, 0.5, 0);
+          panel(g, Fr, wx, MY - 0.09, wx + 0.07, MY - 0.19, 0.7, 0);
         }
 
         /* smoke, drifting off with the wind */
@@ -1001,11 +1003,11 @@
 
         for (k = 0; k <= 6; k++) {
           var wz = Z0 + (Z1 - Z0) * (k / 6);
-          g.line(X0 - 0.04, LY, wz, X1 + 0.04, LY, wz, 0.32, 0);
+          g.line(X0 - 0.04, LY, wz, X1 + 0.04, LY, wz, 0.72, 0);
         }
         for (k = 0; k < done; k++) {
           var kx = X0 + (X1 - X0) * (k / PICKS);
-          g.line(kx, LY, Z0, kx, LY, Z1, 0.5 * cloth, 0);
+          g.line(kx, LY, Z0, kx, LY, Z1, 0.88 * cloth, 0);
         }
         if (done < PICKS) {
           var sx = X0 + (X1 - X0) * (done / PICKS);
@@ -1016,9 +1018,9 @@
           g.line(sx, LY - 0.01, back ? Z1 : Z0, sx, LY - 0.01, sz, 0.85, 1);
           g.dot(sx, LY - 0.02, sz, 1.4, 1, 1.4);
         }
-        g.line(X0, LY, Z0, X0, LY, Z1, 0.45 * cloth, 0);
+        g.line(X0, LY, Z0, X0, LY, Z1, 0.78 * cloth, 0);
         g.line(X0 + (X1 - X0) * (done / PICKS), LY, Z0,
-               X0 + (X1 - X0) * (done / PICKS), LY, Z1, 0.45 * cloth, 0);
+               X0 + (X1 - X0) * (done / PICKS), LY, Z1, 0.78 * cloth, 0);
 
         for (j = 0; j < motes.length; j++) {
           var m = motes[j];

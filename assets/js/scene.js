@@ -11,7 +11,8 @@
    the camera, the ground of a scene sits around y = 0.8, and roughly
    -1.3 .. 1.3 stays inside the frame. `tone` is 0 for the cool structural
    lines and 1 for the warm accent that carries whatever is moving; glyphs also
-   take 2 for the cool blue that speckles a drifting field.
+   take 2 for the cool blue that speckles a drifting field. A scene may set
+   `gain` to lift its ink when it sits farther from the camera than the globe.
 
      g.line(x1,y1,z1, x2,y2,z2, a, tone)
      g.path(flatPts, a, tone, close)
@@ -205,7 +206,7 @@
 
     vDist = CAMERA * (s.dolly || 1);
     vScale = (s.scale || 1) * scale;
-    vAlpha = alpha;
+    vAlpha = alpha * (s.gain || 1);
 
     ctx.lineWidth = 1;
     ctx.textAlign = 'center';
