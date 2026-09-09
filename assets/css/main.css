@@ -174,6 +174,11 @@ main { position: relative; z-index: 5; }
 
 .body + .body { margin-top: 1.15rem; }
 
+.body b {
+  font-weight: 500;
+  color: var(--ink);
+}
+
 /* --------------------------------------------------------------- contact */
 .contact { min-height: 100svh; }
 

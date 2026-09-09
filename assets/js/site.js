@@ -181,6 +181,7 @@
   }
 
   var cipher = document.getElementById('cipher');
+  var cipherHint = document.getElementById('cipherHint');
   if (cipher) {
     /* wrap each character so they can turn over individually */
     function render(text) {
@@ -206,6 +207,10 @@
         cipher.classList.remove('turning');
         cipher.classList.add('done');
         cipher.title = 'click again to send mail';
+        if (cipherHint) {
+          cipherHint.textContent =
+            'The address has turned back. Click again, and it writes.';
+        }
       }, 380);
     });
   }
