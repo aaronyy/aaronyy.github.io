@@ -23,18 +23,21 @@ Everything you'd want to change is in `index.html`, marked with `EDIT ME`:
 - **The chapters.** Each `<section class="chapter">` is one beat. Add or remove
   them freely — the header rail, the scroll progress and the wireframe all
   count the chapters at runtime.
-- **Your portrait.** The `#portrait` canvas has an empty `data-src`. Drop a
-  photo in `assets/img/` and point it there:
+- **Your portrait.** `assets/img/portrait.jpg` is what the point cloud samples.
+  Swap the file, or point `data-src` on the `#portrait` canvas somewhere else.
+  Clear `data-src` entirely and a drawn head-and-shoulders stand-in is sampled
+  instead, so the animation works with no photo at all.
 
-  ```html
-  <canvas id="portrait" data-src="assets/img/portrait.jpg" aria-hidden="true"></canvas>
-  ```
+  Either a light or a dark background works: the sampler averages the frame
+  edge to decide whether the subject is the dark pixels or the bright ones,
+  then floods the background inward from the border. Growing the background
+  from the edge rather than thresholding the whole image is what stops a
+  bright forehead from punching a hole in the face.
 
-  Until you do, a drawn head-and-shoulders stand-in is sampled instead, so the
-  animation works either way. A plain shot on a simple background reads best,
-  because particle density follows the light in the image: bright pixels are
-  kept more often than dark ones. If the cloud looks too sparse or too dense,
-  tune `MAX_POINTS` and the luminance threshold in `portrait.js`.
+  If the cloud looks too sparse or too dense, the two dials in `portrait.js`
+  are `MAX_POINTS` and the base term in `density`. The base is high on purpose
+  so the subject reads as a solid mass with tone as variation on top; drop it
+  too far and flat skin hollows out.
 - **Your email.** The `data-rot` attribute on the cipher button holds your
   address rotated thirteen places, so scrapers see nonsense. To generate it:
 
@@ -53,7 +56,7 @@ Everything you'd want to change is in `index.html`, marked with `EDIT ME`:
 | Glyph letter | `flock.js` | A character is rasterised offscreen and its opaque pixels become particle homes |
 | Wireframe | `scene.js` | Subdivided icosahedron, hand-rolled perspective projection |
 | Chapter morph | `scene.js` | Each chapter seeds per-vertex radial offsets; topology is shared so the cage eases between them |
-| Portrait gather | `portrait.js` | Pixels sampled from a photo become particle targets; scroll drives each one from a scattered origin, staggered per particle |
+| Portrait gather | `portrait.js` | Pixels sampled from a photo become particle targets; scroll drives each one from a scattered origin, staggered per particle. Density carries the likeness, so the dots stay an even brightness the way a stipple drawing does |
 | Chapter reveals | `main.css` | Opacity, translate and blur, staggered per child |
 
 `prefers-reduced-motion: reduce` drops both canvases and shows all copy

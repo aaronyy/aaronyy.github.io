@@ -23,11 +23,10 @@
 
 <!-- ambient layers ------------------------------------------------------- -->
 <canvas id="scene" aria-hidden="true"></canvas>
-<!-- EDIT ME: point data-src at a photo of yourself, e.g.
-     data-src="assets/img/portrait.jpg", and the cloud will sample that
-     instead of the drawn stand-in. A plain head-and-shoulders shot on a
-     simple background reads best, since the particles follow the light. -->
-<canvas id="portrait" data-src="" aria-hidden="true"></canvas>
+<!-- EDIT ME: swap in a different photo here. Either a light or a dark
+     background works; the sampler reads the frame edge to tell which. Clear
+     it to fall back to the drawn stand-in. -->
+<canvas id="portrait" data-src="assets/img/portrait.jpg" aria-hidden="true"></canvas>
 <canvas id="flock" aria-hidden="true"></canvas>
 
 <!-- header --------------------------------------------------------------- -->
