@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Aaron</title>
-<meta name="description" content="Aaron — engineer. A short story in chapters.">
+<meta name="description" content="Aaron Yip. Issa, and the work before it.">
 <meta name="theme-color" content="#0c0c0e">
 
 <meta property="og:type" content="website">
 <meta property="og:title" content="Aaron">
-<meta property="og:description" content="Aaron — engineer. A short story in chapters.">
+<meta property="og:description" content="Aaron Yip. Issa, and the work before it.">
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230c0c0e'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%23e8e4dc' text-anchor='middle'%3Ea%3C/text%3E%3C/svg%3E">
 
@@ -23,10 +23,11 @@
 
 <!-- ambient layers ------------------------------------------------------- -->
 <canvas id="scene" aria-hidden="true"></canvas>
-<!-- EDIT ME: swap in a different photo here. Either a light or a dark
-     background works; the sampler reads the frame edge to tell which. Clear
-     it to fall back to the drawn stand-in. -->
-<canvas id="portrait" data-src="assets/img/portrait.jpg" aria-hidden="true"></canvas>
+<!-- EDIT ME: swap in a different photo here. A cut-out PNG is best, since its
+     alpha channel tells the sampler exactly where you are (see tools/cutout.swift);
+     a plain light or dark background also works. Clear it to fall back to the
+     drawn stand-in. -->
+<canvas id="portrait" data-src="assets/img/portrait.png" aria-hidden="true"></canvas>
 <canvas id="flock" aria-hidden="true"></canvas>
 
 <!-- header --------------------------------------------------------------- -->
@@ -45,15 +46,14 @@
   <section class="hero" id="top" data-chapter="top">
     <div class="wrap">
       <h1 class="hero-name">aaron</h1>
-      <!-- EDIT ME: your one-line thesis. The three <b class="cue"> words drive
-           the flock animation. Keep three of them, rename them to whatever you
-           like, and keep the data-cue values (gather / race / ring). -->
+      <!-- The three <b class="cue"> words drive the flock. Keep three of them,
+           and keep the data-cue values (gather / race / ring). -->
       <p class="hero-line reveal">
-        I build software for people, not for demos. The parts I care about are
+        I build for people who are starting over. The parts I care about are
         the ones that have to stay <b class="cue" data-cue="gather" tabindex="0" role="button" aria-label="clear: gathers the flock into a V">clear</b>,
         <b class="cue" data-cue="race" tabindex="0" role="button" aria-label="quick: sends the flock racing">quick</b>, and
         <b class="cue" data-cue="ring" tabindex="0" role="button" aria-label="honest: rings the flock around the letter">honest</b>
-        while everything around them grows.
+        while a life is moving.
       </p>
     </div>
     <span class="scroll-hint" id="scrollHint">scroll</span>
@@ -62,33 +62,30 @@
   <!-- story -------------------------------------------------------------- -->
   <div id="story"></div>
 
-  <!-- EDIT ME ------------------------------------------------------------
-       Each <section class="chapter"> is one beat of your story.
-       Add or remove them freely: the header rail, the scroll progress and the
-       wireframe scene all count the chapters at runtime, so nothing else
-       needs updating. Keep them newest-first.
-  --------------------------------------------------------------------- -->
-
   <section class="chapter" data-chapter="c1">
     <div class="wrap">
-      <p class="year reveal">2024 &ndash; now</p>
-      <h2 class="reveal">Replace this with the work you are proudest of.</h2>
+      <p class="year reveal">2023 &ndash; now</p>
+      <h2 class="reveal">A country, as software.</h2>
       <p class="body reveal">
-        Two or three sentences, plainly written. What the system was, what it
-        had to survive, and the one thing you learned that you would not have
-        learned anywhere else. Concrete beats grand.
+        At Issa I turn Thai immigration into software: visas, work permits,
+        the fifty hours of forms that used to take nine months and three
+        thousand dollars. We started in a wet market. Two weeks later Zin, a
+        mathematician packing fish until dawn, had a restaurant job and
+        three times the pay. The rest of the company is that, repeated.
       </p>
     </div>
   </section>
 
   <section class="chapter" data-chapter="c2">
     <div class="wrap">
-      <p class="year reveal">2021 &ndash; 2024</p>
-      <h2 class="reveal">A chapter about scale.</h2>
+      <p class="year reveal">2021 &ndash; 2022</p>
+      <h2 class="reveal">A language is a border.</h2>
       <p class="body reveal">
-        Describe the job nobody notices when it works. Name the constraint that
-        made it hard, not the org chart. If a number tells the story better than
-        an adjective, use the number.
+        In Medellín I helped Viva put live translation into meetings, across
+        twenty countries, for people who would otherwise not be in the room.
+        The waitlist hit a hundred thousand in a month. I learned that the
+        hardest part of moving is often the conversation that has to happen
+        first.
       </p>
     </div>
   </section>
@@ -96,43 +93,56 @@
   <section class="chapter" data-chapter="c3">
     <div class="wrap">
       <p class="year reveal">2019 &ndash; 2021</p>
-      <h2 class="reveal">A chapter about starting something.</h2>
+      <h2 class="reveal">Who gets a place.</h2>
       <p class="body reveal">
-        The prototype, the pitch, the first customer who said no. What you built,
-        what you cut, and how you decided which was which.
+        At Social Construct, Y Combinator&rsquo;s New Cities lab, I ran the
+        software that took a building from a sketch to a supply schedule to
+        the robots that would put it up. In the same years I co-founded
+        OutBrave, a studio for migration and anti-trafficking, and helped raise
+        tens of millions for partners who would never look like a startup.
+        Both jobs were about who is allowed to stay.
       </p>
     </div>
   </section>
 
   <section class="chapter" data-chapter="c4">
     <div class="wrap">
-      <p class="year reveal">2016 &ndash; 2019</p>
-      <h2 class="reveal">A chapter about craft.</h2>
+      <p class="year reveal">2015 &ndash; 2019</p>
+      <h2 class="reveal">A room you could walk around.</h2>
       <p class="body reveal">
-        The stretch where you got noticeably better at something. Say what you
-        could do at the end of it that you could not do at the start.
+        Houzz bought the company. I stayed and helped start its moonshot
+        studio, an AR and VR lab for how people imagine a home. I guest
+        lectured at Stanford on the same problems. The work that survives a
+        sale is the work you still want to do when the logo changes.
       </p>
     </div>
   </section>
 
   <section class="chapter" data-chapter="c5">
     <div class="wrap">
-      <p class="year reveal">2013 &ndash; 2016</p>
-      <h2 class="reveal">A chapter about a team.</h2>
+      <p class="year reveal">2014 &ndash; 2015</p>
+      <h2 class="reveal">Starting from a camera.</h2>
       <p class="body reveal">
-        The moment being the only person who understood a system stopped being
-        flattering and started being a risk. What you did about it.
+        Roominnate used computer vision to reconstruct interiors in three
+        dimensions. In six months we had pilots with Facebook, Microsoft,
+        Valve, and a handful of Fortune 500s. We sold to Houzz so the thing
+        would reach families instead of remaining a demo. I was twenty-three.
+        I learned that an exit is a decision about who the work is for.
       </p>
     </div>
   </section>
 
   <section class="chapter" data-chapter="c6">
     <div class="wrap">
-      <p class="year reveal">2010 &ndash; 2013</p>
-      <h2 class="reveal">A chapter about the early years.</h2>
+      <p class="year reveal">2013 &ndash; 2014</p>
+      <h2 class="reveal">Games, then the layer underneath.</h2>
       <p class="body reveal">
-        Where you started, however unglamorous. Firmware, spreadsheets, support
-        tickets, whatever it was. This is usually the most interesting chapter.
+        I started in games: algorithms for an AMC title that twenty million
+        people played, then Big Fish, where I moved from gameplay to a native
+        SDK that shipped the same thing to web, phone, and desktop for more
+        than a hundred million. The company later sold for nearly a billion.
+        What I kept was the habit of shipping to people who will never know
+        your name.
       </p>
     </div>
   </section>
@@ -140,10 +150,13 @@
   <section class="chapter" data-chapter="c7">
     <div class="wrap">
       <p class="year reveal">before</p>
-      <h2 class="reveal">A chapter about why any of this.</h2>
+      <h2 class="reveal">A carpet mill in Georgia.</h2>
       <p class="body reveal">
-        The thing you were doing before it was a job. Close the loop back to the
-        first line on the page.
+        My father was a street orphan in Hong Kong. He moved to rural Georgia
+        to work in a mill. My mother worked next to him. I worked three jobs
+        through Georgia Tech and mopped floors for a room. Everything after
+        that is their work, continuing. I build for people who are doing
+        what they did.
       </p>
     </div>
   </section>
@@ -163,7 +176,7 @@
       <p class="links reveal">
         <!-- EDIT ME: your profiles -->
         <a href="https://github.com/aaronyy" rel="me">github</a>
-        <a href="https://www.linkedin.com/" rel="me">linkedin</a>
+        <a href="https://www.linkedin.com/in/aaron-builds/" rel="me">linkedin</a>
       </p>
     </div>
   </section>

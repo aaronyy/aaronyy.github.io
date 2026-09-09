@@ -11,6 +11,9 @@ assets/js/flock.js      boid flock + the glyph letter on the hero
 assets/js/scene.js      the wireframe that turns beside the story
 assets/js/portrait.js   the point cloud that gathers into a portrait
 assets/js/site.js       scroll state, chapter rail, cue words, cipher
+assets/img/portrait.png the cut-out the point cloud samples
+tools/cutout.swift      regenerates that cut-out from a photo
+tools/source-photo.png  the photo it was cut out of
 ```
 
 ## Editing
@@ -23,21 +26,26 @@ Everything you'd want to change is in `index.html`, marked with `EDIT ME`:
 - **The chapters.** Each `<section class="chapter">` is one beat. Add or remove
   them freely — the header rail, the scroll progress and the wireframe all
   count the chapters at runtime.
-- **Your portrait.** `assets/img/portrait.jpg` is what the point cloud samples.
+- **Your portrait.** `assets/img/portrait.png` is what the point cloud samples.
   Swap the file, or point `data-src` on the `#portrait` canvas somewhere else.
   Clear `data-src` entirely and a drawn head-and-shoulders stand-in is sampled
   instead, so the animation works with no photo at all.
 
-  Either a light or a dark background works: the sampler averages the frame
-  edge to decide whether the subject is the dark pixels or the bright ones,
-  then floods the background inward from the border. Growing the background
-  from the edge rather than thresholding the whole image is what stops a
-  bright forehead from punching a hole in the face.
+  A cut-out PNG gives the best result, because its alpha channel tells the
+  sampler exactly where you are. To make one from any photo, background and
+  all, see **Regenerating the cut-out** below.
 
-  If the cloud looks too sparse or too dense, the two dials in `portrait.js`
-  are `MAX_POINTS` and the base term in `density`. The base is high on purpose
-  so the subject reads as a solid mass with tone as variation on top; drop it
-  too far and flat skin hollows out.
+  A plain background works too, with no cut-out step: the sampler averages the
+  frame edge to decide whether the subject is the dark pixels or the bright
+  ones, then floods the background inward from the border. Growing it from the
+  edge rather than thresholding the whole image is what stops a bright
+  forehead from punching a hole in the face. This only holds up on an even
+  backdrop, though — a busy one leaves the clutter in.
+
+  If the cloud looks wrong, the dials in `portrait.js` are `MAX_POINTS` and
+  the three terms in `density`: a base so flat areas don't hollow out, a tone
+  term so lit skin separates from dark clothing, and a local contrast term
+  that keeps features legible once colour is gone.
 - **Your email.** The `data-rot` attribute on the cipher button holds your
   address rotated thirteen places, so scrapers see nonsense. To generate it:
 
@@ -61,6 +69,20 @@ Everything you'd want to change is in `index.html`, marked with `EDIT ME`:
 
 `prefers-reduced-motion: reduce` drops both canvases and shows all copy
 immediately.
+
+## Regenerating the cut-out
+
+`tools/cutout.swift` runs Vision's person segmentation over a photo and writes
+a PNG whose alpha channel is the subject mask. It needs nothing but the macOS
+SDK, so it works offline.
+
+```sh
+swiftc -O tools/cutout.swift -o /tmp/cutout
+/tmp/cutout tools/source-photo.png assets/img/portrait.png
+```
+
+Doing this once, ahead of time, is much more reliable than trying to separate a
+subject from a busy background in the browser on every page load.
 
 ## Local preview
 

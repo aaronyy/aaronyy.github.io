@@ -1,12 +1,18 @@
 /* ---------------------------------------------------------------------------
    portrait.js — the point cloud that assembles into a portrait at the bottom.
 
-   A photo (or, absent one, a procedurally drawn bust) is rasterised offscreen
-   and sampled on a grid. Each surviving pixel becomes a particle, kept with a
-   probability that follows how strongly it reads against its background, so
-   the cloud thickens over hair, brows and the line of the mouth and thins out
-   across flat skin. Density carries the likeness; the dots stay a fairly even
-   brightness, the way a stipple drawing works.
+   An image is rasterised offscreen and sampled on a grid. Each surviving pixel
+   becomes a particle, kept with a probability built from a solid base plus the
+   local tone and contrast, so the silhouette always reads while hair, brows
+   and the line of the mouth thicken up. Density carries the likeness; the dots
+   stay a fairly even brightness, the way a stipple drawing works.
+
+   Finding the subject takes one of two routes:
+     - a cut-out PNG arrives with its background already transparent, so its
+       alpha channel *is* the mask and nothing needs guessing
+     - otherwise the frame edge is averaged to work out whether the subject is
+       the dark pixels or the bright ones, and the background is flooded inward
+       from the border
 
    Every particle holds a scattered origin and a target on the portrait. Scroll
    progress drives the trip between them, with a per-particle delay so the
@@ -94,6 +100,36 @@
     c.globalCompositeOperation = 'source-over';
   }
 
+  /* ------------------------------------------------------- subject masking */
+
+  /* Grow the background inward from the frame. Thresholding the whole image
+     instead would cut bright highlights out of the middle of a face. */
+  function floodBackground(lum, alpha, bw, bh, darkIsDense) {
+    var bg = new Uint8Array(bw * bh);
+    var stack = [];
+
+    function seed(sx, sy) {
+      if (sx < 0 || sy < 0 || sx >= bw || sy >= bh) return;
+      var k = sy * bw + sx;
+      if (bg[k]) return;
+      var isBg = alpha[k] < 24 || (darkIsDense ? lum[k] > 0.80 : lum[k] < 0.12);
+      if (!isBg) return;
+      bg[k] = 1;
+      stack.push(k);
+    }
+
+    for (var x = 0; x < bw; x++) { seed(x, 0); seed(x, bh - 1); }
+    for (var y = 0; y < bh; y++) { seed(0, y); seed(bw - 1, y); }
+
+    while (stack.length) {
+      var p = stack.pop();
+      var px = p % bw;
+      var py = (p - px) / bw;
+      seed(px + 1, py); seed(px - 1, py); seed(px, py + 1); seed(px, py - 1);
+    }
+    return bg;
+  }
+
   /* ------------------------------------------------------------ sampling */
 
   function samplePixels(buffer, bw, bh) {
@@ -102,68 +138,63 @@
     var i, x, y;
 
     var lum = new Float32Array(n);
-    var opaque = new Uint8Array(n);
+    var alpha = new Uint8Array(n);
+    var clear = 0;
+
     for (i = 0; i < n; i++) {
       var o = i * 4;
-      if (data[o + 3] < 24) continue;
-      opaque[i] = 1;
+      alpha[i] = data[o + 3];
+      if (data[o + 3] < 24) { clear++; continue; }
       lum[i] = (data[o] * 0.2126 + data[o + 1] * 0.7152 + data[o + 2] * 0.0722) / 255;
     }
 
-    /* Work out which way round the image is by averaging its border. A studio
-       photo on white needs the dark pixels; the drawn bust is light on
-       transparent and needs the bright ones. */
-    var edge = 0, edgeN = 0;
-    for (x = 0; x < bw; x++) { edge += lum[x] + lum[(bh - 1) * bw + x]; edgeN += 2; }
-    for (y = 0; y < bh; y++) { edge += lum[y * bw] + lum[y * bw + bw - 1]; edgeN += 2; }
-    var darkIsDense = (edge / edgeN) > 0.55;
+    var subject = new Uint8Array(n);
 
-    /* Flood the background inward from the frame, so only the subject is left.
-       Growing from the border rather than thresholding globally means a bright
-       forehead or a catchlight never punches a hole in the face. */
-    var bg = new Uint8Array(n);
-    var stack = [];
+    if (clear / n > 0.04) {
+      /* Already cut out: alpha is the mask. 128 rather than 0 keeps the
+         antialiased rim from becoming a halo of stray particles. */
+      for (i = 0; i < n; i++) subject[i] = alpha[i] >= 128 ? 1 : 0;
+    } else {
+      var edge = 0, edgeN = 0;
+      for (x = 0; x < bw; x++) { edge += lum[x] + lum[(bh - 1) * bw + x]; edgeN += 2; }
+      for (y = 0; y < bh; y++) { edge += lum[y * bw] + lum[y * bw + bw - 1]; edgeN += 2; }
+      var darkIsDense = (edge / edgeN) > 0.55;
 
-    function seed(sx, sy) {
-      if (sx < 0 || sy < 0 || sx >= bw || sy >= bh) return;
-      var k = sy * bw + sx;
-      if (bg[k]) return;
-      var isBg = !opaque[k] || (darkIsDense ? lum[k] > 0.80 : lum[k] < 0.12);
-      if (!isBg) return;
-      bg[k] = 1;
-      stack.push(k);
-    }
+      var bg = floodBackground(lum, alpha, bw, bh, darkIsDense);
+      for (i = 0; i < n; i++) subject[i] = (!bg[i] && alpha[i] >= 24) ? 1 : 0;
 
-    for (x = 0; x < bw; x++) { seed(x, 0); seed(x, bh - 1); }
-    for (y = 0; y < bh; y++) { seed(0, y); seed(bw - 1, y); }
-
-    while (stack.length) {
-      var p = stack.pop();
-      var px = p % bw;
-      var py = (p - px) / bw;
-      seed(px + 1, py); seed(px - 1, py); seed(px, py + 1); seed(px, py - 1);
+      /* A dark subject on a light ground wants its tones read the other way
+         up, so the emphasis still lands on hair and brows. */
+      if (darkIsDense) {
+        for (i = 0; i < n; i++) if (subject[i]) lum[i] = 1 - lum[i];
+      }
     }
 
     var found = [];
     for (y = 0; y < bh; y += STEP) {
       for (x = 0; x < bw; x += STEP) {
         i = y * bw + x;
-        if (bg[i] || !opaque[i]) continue;
+        if (!subject[i]) continue;
 
-        /* 0 where the subject melts into its background, 1 at the strongest
-           tones, which is what makes features legible in a flat point cloud.
-           The base is deliberately high: the subject wants to read as a solid
-           mass, with tone as variation on top rather than the whole signal,
-           or flat skin hollows out and the face reads as a hole. */
-        var detail = darkIsDense ? 1 - lum[i] : lum[i];
-        var density = Math.min(1, 0.56 + detail * 0.5);
+        /* local contrast, which is what keeps features legible once colour is
+           thrown away and only dot density is left to carry them */
+        var gx = (x > 0 && x < bw - 1) ? lum[i + 1] - lum[i - 1] : 0;
+        var gy = (y > 0 && y < bh - 1) ? lum[i + bw] - lum[i - bw] : 0;
+        var grad = Math.min(1, Math.sqrt(gx * gx + gy * gy) * 3.2);
+        var tone = lum[i];
+
+        /* The base keeps flat areas from hollowing out entirely, which on a
+           dark shirt would lose the whole torso. Tone carries most of the
+           weight on top of it, so a lit face separates from dark clothing
+           instead of everything landing at the same density. */
+        var density = Math.min(1, 0.42 + tone * 0.45 + grad * 0.34);
 
         /* dissolve the last stretch so the shoulders trail off into nothing */
         var fy = y / bh;
         if (fy > 0.74) density *= 1 - (fy - 0.74) / 0.26;
 
         if (Math.random() > density) continue;
-        found.push({ x: x, y: y, detail: detail });
+        found.push({ x: x, y: y, tone: tone, grad: grad });
       }
     }
 
@@ -186,8 +217,8 @@
         sx: Math.cos(a) * r,
         sy: Math.sin(a) * r * 0.75,
         delay: Math.random() * 0.55,
-        alpha: Math.min(0.92, 0.36 + q.detail * 0.5),
-        size: q.detail > 0.55 ? 1.7 : 1.2,
+        alpha: Math.min(0.95, 0.22 + q.tone * 0.62 + q.grad * 0.22),
+        size: (q.tone > 0.6 || q.grad > 0.5) ? 1.7 : 1.2,
         phase: rand(0, Math.PI * 2),
         drift: rand(0.004, 0.013)
       };
@@ -209,7 +240,7 @@
     samplePixels(c, bw, bh);
   }
 
-  /* Try the photo named on the canvas; fall back to the drawn bust. */
+  /* Try the image named on the canvas; fall back to the drawn bust. */
   function load() {
     var src = canvas.dataset.src;
     if (!src) { buildFrom(null); return; }
@@ -231,13 +262,12 @@
 
     var p = progress;
 
-    /* The full budget packed into a phone-sized cloud turns muddy, so draw an
-       even subset there. The set was shuffled at build time, which is what
-       makes taking every other one a fair thinning rather than a crop. */
-    var stride = scale < 340 ? 2 : 1;
-    var dot = scale < 340 ? 0.85 : 1;
+    /* Smaller dots on a phone-sized cloud, so the detail survives the scale
+       down without the points blurring into each other. Thinning the set
+       instead loses too much of a dark subject. */
+    var dot = scale < 340 ? 0.7 : 1;
 
-    for (var i = 0; i < points.length; i += stride) {
+    for (var i = 0; i < points.length; i++) {
       var q = points[i];
 
       /* stagger: each particle starts its trip a little later than the last */
