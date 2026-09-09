@@ -43,6 +43,10 @@
     return v;
   }
 
+  function clamp(v, a, b) {
+    return v < a ? a : v > b ? b : v;
+  }
+
   /* --------------------------------------------------------- the letter */
 
   /* Rasterise a character offscreen, then keep every opaque pixel on a grid.
@@ -90,6 +94,12 @@
 
   /* ---------------------------------------------------------- the birds */
 
+  /* Shared wingbeat with a tight starting spread. Neighbours pull phases
+     together (Kuramoto), so a stray bird catches the flock instead of
+     drifting on its own clock. flapRate is a tiny personal tempo, not a
+     second oscillator. */
+  var CAM = 0.95;                       // look down, off vertical, so a flap has height
+
   function buildBirds() {
     var count = W < 700 ? 7 : W < 1200 ? 11 : 15;
     birds = [];
@@ -100,9 +110,13 @@
         y: rand(H * 0.08, H * 0.82),
         vx: Math.cos(a) * rand(0.5, 1.3),
         vy: Math.sin(a) * rand(0.5, 1.3) * 0.4,
-        size: rand(8, 15),
-        flapPhase: rand(0, Math.PI * 2),
-        flapRate: rand(0.09, 0.16),
+        size: rand(18, 28),
+        heading: a,
+        roll: 0,
+        pitch: 0.14,
+        z: rand(-0.65, 0.85),
+        flapPhase: rand(0, 0.2),
+        flapRate: rand(0.98, 1.02),
         wanderSeed: rand(0, 1000),
         trail: []
       });
@@ -173,7 +187,7 @@
           var hx = leader.vx, hy = leader.vy;
           var hm = Math.hypot(hx, hy) || 1;
           hx /= hm; hy /= hm;
-          var spacing = 34 * rank;
+          var spacing = 44 * rank;
           var tx = leader.x - hx * spacing + -hy * side * spacing * 0.72;
           var ty = leader.y - hy * spacing + hx * side * spacing * 0.72;
           f.x += (tx - b.x) * 0.0055 * blend;
@@ -228,29 +242,179 @@
       if (b.y > H + pad)  { b.y = -pad;    wrapped = true; }
       if (wrapped) b.trail.length = 0;
 
-      b.flapPhase += b.flapRate * dt * (0.6 + Math.hypot(b.vx, b.vy) * 0.4);
+      var h = Math.atan2(b.vy, b.vx);
+      var dh = h - b.heading;
+      while (dh > Math.PI) dh -= Math.PI * 2;
+      while (dh < -Math.PI) dh += Math.PI * 2;
+      b.heading = h;
+      var targetRoll = clamp(-dh / Math.max(dt, 0.001) * 0.42, -0.95, 0.95);
+      b.roll += (targetRoll - b.roll) * Math.min(1, 0.14 * dt);
+      var targetPitch = clamp(0.14 - b.vy * 0.16, -0.35, 0.45);
+      b.pitch += (targetPitch - b.pitch) * Math.min(1, 0.10 * dt);
+
+      b.z += Math.sin(t * 0.0065 + n * 0.4) * 0.003 * dt;
+      b.z = clamp(b.z, -1, 1);
 
       b.trail.push(b.x, b.y);
       var keep = (mode === 'race' ? 16 : 8) * 2;
       while (b.trail.length > keep) b.trail.shift();
     }
+
+    /* Advance every wingbeat from the same snapshot so the flock doesn't
+       fall into a travelling wave of phases. */
+    var phases = [];
+    for (i = 0; i < birds.length; i++) phases[i] = birds[i].flapPhase;
+    var kFlap = mode === 'gather' ? 0.34 : mode === 'ring' ? 0.26 : 0.22;
+    var flapRadius = mode === 'gather' ? 320 : 240;
+    for (i = 0; i < birds.length; i++) {
+      var bird = birds[i];
+      var sum = 0, nNear = 0;
+      for (var j = 0; j < birds.length; j++) {
+        if (j === i) continue;
+        var other = birds[j];
+        if (Math.hypot(other.x - bird.x, other.y - bird.y) < flapRadius) {
+          sum += Math.sin(phases[j] - phases[i]);
+          nNear++;
+        }
+      }
+      var speedNow = Math.hypot(bird.vx, bird.vy);
+      var omega = 0.118 * (0.88 + speedNow * 0.22);
+      if (mode === 'race') omega *= 1.28;
+      var couple = nNear ? (sum / nNear) * kFlap : 0;
+      bird.flapPhase += (omega + couple) * dt * bird.flapRate;
+    }
   }
 
   /* ------------------------------------------------------------ drawing */
 
-  /* A gull silhouette drawn nose-up, so the caller only has to rotate by the
-     heading. Each wing is a swept curve out to a tip that rises and falls
-     with the flap phase; the leading and trailing edges bow in opposite
-     directions so the body keeps some area even at full extension. */
-  function birdPath(c, s, flap) {
-    var tipY = s * 0.16 - s * 0.46 * flap;   // wingtips trail behind and flap
-    c.beginPath();
-    c.moveTo(0, -s * 0.34);                                   // nose
-    c.quadraticCurveTo(s * 0.40, -s * 0.26, s, tipY);         // right leading edge
-    c.quadraticCurveTo(s * 0.48, s * 0.04, 0, s * 0.13);      // right trailing, concave
-    c.quadraticCurveTo(-s * 0.48, s * 0.04, -s, tipY);        // left trailing, concave
-    c.quadraticCurveTo(-s * 0.40, -s * 0.26, 0, -s * 0.34);   // left leading edge
-    c.closePath();
+  function signedArea(pts) {
+    var a = 0;
+    for (var i = 0, n = pts.length; i < n; i++) {
+      var p = pts[i], q = pts[(i + 1) % n];
+      a += p.x * q.y - q.x * p.y;
+    }
+    return a;
+  }
+
+  function fillPoly(pts, color, alpha) {
+    if (pts.length < 3 || alpha <= 0.01) return;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  /* Local bird space is X forward, Y right, Z up. Roll / pitch / heading
+     then a downward camera so the upstroke foreshortens and a bank shows
+     one wing large and one thin. */
+  function drawBird(b) {
+    var flap = Math.sin(b.flapPhase);
+    var flapA = 0.22 + flap * 0.95;        // rest with dihedral; stroke goes well above/below
+    var s = b.size * (1.12 + b.z * 0.42);
+    var alpha = 0.46 + 0.42 * (b.z + 1) * 0.5;
+
+    var ch = Math.cos(b.heading), sh = Math.sin(b.heading);
+    var cr = Math.cos(b.roll), sr = Math.sin(b.roll);
+    var cp = Math.cos(b.pitch), sp = Math.sin(b.pitch);
+    var cc = Math.cos(CAM), sc = Math.sin(CAM);
+
+    function xf(x, y, z) {
+      var y1 = y * cr - z * sr;
+      var z1 = y * sr + z * cr;
+      var x2 = x * cp + z1 * sp;
+      var z2 = -x * sp + z1 * cp;
+      var y2 = y1;
+      var sx = x2 * ch - y2 * sh;
+      var sy = x2 * sh + y2 * ch;
+      return {
+        x: b.x + sx,
+        y: b.y + sy * cc - z2 * sc,
+        z: sy * sc + z2 * cc
+      };
+    }
+
+    /* Contact shadow, stretched with the wing stroke so the bird sits in space. */
+    var spread = 0.45 + 0.55 * Math.cos(flapA);
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.16;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(b.x, b.y + s * 0.42, s * 0.95 * Math.abs(spread), s * 0.16, b.heading, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    function wing(side) {
+      var a = side * flapA;
+      var ca = Math.cos(a), sa = Math.sin(a);
+      var sweep = s * 0.10 * (1 - flap);   // tips trail on the downstroke
+      var raw = [
+        [s * 0.08, side * s * 0.05, s * 0.02],
+        [s * 0.12 - sweep * 0.3, side * s * 0.62, s * 0.04],
+        [-sweep, side * s * 1.35, s * 0.06],
+        [-s * 0.32 - sweep * 0.4, side * s * 0.88, 0],
+        [-s * 0.18, side * s * 0.08, -s * 0.02]
+      ];
+      var pts = [];
+      for (var i = 0; i < raw.length; i++) {
+        var p = raw[i];
+        pts.push(xf(p[0], p[1] * ca - p[2] * sa, p[1] * sa + p[2] * ca));
+      }
+      return pts;
+    }
+
+    function paintWing(pts) {
+      var area = signedArea(pts);
+      var underside = area > 0;
+      fillPoly(pts, underside ? '#6f6a60' : '#d8c9a3', alpha * (underside ? 0.82 : 1));
+      if (Math.abs(area) < 40) {
+        ctx.globalAlpha = alpha * 0.8;
+        ctx.strokeStyle = underside ? '#8a8478' : '#d8c9a3';
+        ctx.lineWidth = 1.3;
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+      }
+    }
+
+    var left = wing(-1), right = wing(1);
+    var leftZ = (left[0].z + left[2].z) * 0.5;
+    var rightZ = (right[0].z + right[2].z) * 0.5;
+
+    if (leftZ < rightZ) paintWing(left);
+    else paintWing(right);
+
+    fillPoly([
+      xf(s * 0.22, 0, -s * 0.05),
+      xf(s * 0.02, -s * 0.08, -s * 0.07),
+      xf(-s * 0.28, 0, -s * 0.04),
+      xf(s * 0.02, s * 0.08, -s * 0.07)
+    ], '#7a7468', alpha * 0.75);
+
+    fillPoly([
+      xf(s * 0.58, 0, s * 0.03),
+      xf(s * 0.08, s * 0.11, s * 0.05),
+      xf(-s * 0.42, 0, s * 0.03),
+      xf(s * 0.08, -s * 0.11, s * 0.05)
+    ], '#e8dcc0', alpha);
+
+    fillPoly([
+      xf(-s * 0.30, 0, s * 0.02),
+      xf(-s * 0.62, -s * 0.13, 0),
+      xf(-s * 0.50, 0, -s * 0.02),
+      xf(-s * 0.62, s * 0.13, 0)
+    ], '#c8bb9a', alpha * 0.92);
+
+    fillPoly([
+      xf(s * 0.42, 0, s * 0.07),
+      xf(s * 0.58, -s * 0.05, s * 0.02),
+      xf(s * 0.72, 0, 0),
+      xf(s * 0.58, s * 0.05, s * 0.02)
+    ], '#f0e6ce', alpha);
+
+    if (leftZ < rightZ) paintWing(right);
+    else paintWing(left);
   }
 
   function drawGlyphs() {
@@ -291,15 +455,17 @@
   }
 
   function drawBirds() {
-    for (var i = 0; i < birds.length; i++) {
-      var b = birds[i];
-      var angle = Math.atan2(b.vy, b.vx);
-      var flap = Math.sin(b.flapPhase);
+    var order = [];
+    for (var i = 0; i < birds.length; i++) order.push(i);
+    order.sort(function (a, j) { return birds[a].z - birds[j].z; });
 
-      /* trail */
+    for (i = 0; i < order.length; i++) {
+      var b = birds[order[i]];
+      var trailA = (mode === 'race' ? 0.18 : 0.08) * (0.55 + (b.z + 1) * 0.22);
+
       if (b.trail.length > 5) {
         ctx.save();
-        ctx.strokeStyle = 'rgba(216, 201, 163, ' + (mode === 'race' ? 0.20 : 0.09) + ')';
+        ctx.strokeStyle = 'rgba(216, 201, 163, ' + trailA + ')';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(b.trail[0], b.trail[1]);
@@ -309,12 +475,7 @@
       }
 
       ctx.save();
-      ctx.translate(b.x, b.y);
-      ctx.rotate(angle + Math.PI / 2);
-      ctx.globalAlpha = 0.52 + Math.abs(flap) * 0.34;
-      ctx.fillStyle = '#d8c9a3';
-      birdPath(ctx, b.size, flap);
-      ctx.fill();
+      drawBird(b);
       ctx.restore();
     }
   }

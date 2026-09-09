@@ -110,6 +110,8 @@ main { position: relative; z-index: 5; }
   color: var(--ink-soft);
 }
 
+.hero-line + .hero-line { margin-top: 1.15rem; }
+
 /* the three animation cues */
 .cue {
   font-weight: 400;
