@@ -183,7 +183,7 @@
 
     for (var i = 0; i < birds.length; i++) {
       var b = birds[i];
-      var slotX = 0, slotY = 0, slotDist = 0, slotAlong = 0;
+      var slotX = 0, slotY = 0, slotDist = 0, slotAlong = 0, catching = 0;
       if (mode === 'gather' && i > 0 && leader) {
         var slot = chevronSlot(leader, i);
         slotX = slot.x;
@@ -191,6 +191,7 @@
         slotDist = Math.hypot(slotX - b.x, slotY - b.y);
         slotAlong = (slotX - b.x) * Math.cos(leader.heading) +
                     (slotY - b.y) * Math.sin(leader.heading);
+        catching = clamp(slotDist / 110, 0, 1);
       }
 
       /* Lead bird on scale: fly as if the rest of the flock isn't there. */
@@ -216,17 +217,18 @@
 
       if (mode === 'gather' && i > 0 && leader) {
         /* Fly into the V: keep the lead's cruise, close the slot error,
-           and add a little extra speed when still behind / off-station. */
+           and sprint when still behind / off-station. */
         var leadSp = Math.hypot(leader.vx, leader.vy) || 1.2;
-        var catchup = slotAlong > 8 ? clamp(slotAlong / 180, 0, 1) : 0;
-        var off = clamp(slotDist / 140, 0, 1);
-        var extra = catchup * 1.6 + off * 0.85;
-        maxSpeed = leadSp + 0.15 + extra;
-        minSpeed = slotDist < 28 ? Math.max(0.8, leadSp - 0.15) : 0.8;
-        if (slotAlong < -16) maxSpeed = Math.min(maxSpeed, leadSp * 0.84);
+        var catchup = slotAlong > 4 ? clamp(slotAlong / 120, 0, 1) : 0;
+        var extra = catchup * 2.6 + catching * 2.0;
+        maxSpeed = leadSp + 0.2 + extra;
+        minSpeed = slotDist < 28 ? Math.max(0.8, leadSp - 0.12) : 1.15;
+        if (slotAlong < -16 && slotDist < 80) {
+          maxSpeed = Math.min(maxSpeed, leadSp * 0.88);
+        }
 
-        var close = 0.008 + off * 0.012;
-        var match = 0.05 + (1 - off) * 0.07;
+        var close = 0.014 + catching * 0.032;
+        var match = 0.07 + catching * 0.12;
         f.x += (leader.vx + (slotX - b.x) * close - b.vx) * match;
         f.y += (leader.vy + (slotY - b.y) * close - b.vy) * match;
 
@@ -258,7 +260,7 @@
         f.y += (Math.cos(slot) * tang - b.vy) * 0.05 * blend;
       }
 
-      limit(f, (mode === 'gather' && i > 0) ? 0.28 : 0.22);
+      limit(f, 0.22 + catching * 0.34);
       b.vx += f.x * dt;
       b.vy += f.y * dt;
 
@@ -283,7 +285,7 @@
       }
       var dh = wrapPi(wantH - b.heading);
       var maxTurn = 0.10 * dt;
-      if (mode === 'gather') maxTurn = (i === 0 ? 0.016 : 0.068) * dt;
+      if (mode === 'gather') maxTurn = (i === 0 ? 0.016 : 0.07 + catching * 0.055) * dt;
       dh = clamp(dh, -maxTurn, maxTurn);
       b.heading += dh;
       b.vx = Math.cos(b.heading) * speed;

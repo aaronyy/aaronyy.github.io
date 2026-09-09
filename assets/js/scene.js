@@ -248,19 +248,25 @@
   /* ------------------------------------------------------------- sizing */
 
   function resize() {
-    dpr = Math.min(2, window.devicePixelRatio || 1);
     W = window.innerWidth;
     H = window.innerHeight;
+    dpr = Math.min(W < 880 ? 1.5 : 2, window.devicePixelRatio || 1);
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    visible = W >= 880;                 /* no room for it on a phone */
-    cx = W * 0.72;
-    cy = H * 0.5;
-    radius = Math.min(W * 0.132, H * 0.235);
+    if (W >= 880) {
+      cx = W * 0.72;
+      cy = H * 0.5;
+      radius = Math.min(W * 0.132, H * 0.235);
+    } else {
+      /* same upper third the letter and portrait use, so the copy can sit under it */
+      cx = W * 0.5;
+      cy = H * 0.22;
+      radius = Math.min(W * 0.34, H * 0.155);
+    }
   }
 
   /* ------------------------------------------------------------- public */

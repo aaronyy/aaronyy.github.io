@@ -65,7 +65,7 @@
           io.unobserve(entry.target);
         }
       });
-    }, { rootMargin: '0px 0px -18% 0px', threshold: 0.1 });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.06 });
 
     document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
   } else {

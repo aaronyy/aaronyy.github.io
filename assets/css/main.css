@@ -79,14 +79,21 @@ main { position: relative; z-index: 5; }
   .wrap { width: min(30rem, 44vw); }
 }
 
-/* Narrow screens have no side room, so the glyph letter and the portrait take
-   the upper third and the copy drops to the bottom rather than sitting under
-   the particles. */
+/* Narrow screens have no side room, so the scene, the glyph letter and the
+   portrait take the upper third and the copy drops to the bottom rather than
+   sitting under the lines. */
 @media (max-width: 55rem) {
   .hero,
-  .contact {
+  .chapter {
     justify-content: flex-end;
-    padding-bottom: 20vh;
+    padding-top: 36vh;
+    padding-bottom: max(5.5rem, 11vh);
+  }
+  .scroll-hint { display: none; }
+  .hero-name { font-size: clamp(3.1rem, 16vw, 5.2rem); }
+  .wrap {
+    width: calc(100% - var(--gutter));
+    padding-right: var(--gutter);
   }
 }
 
