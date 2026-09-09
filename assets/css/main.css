@@ -172,6 +172,8 @@ main { position: relative; z-index: 5; }
   color: var(--ink-soft);
 }
 
+.body + .body { margin-top: 1.15rem; }
+
 /* --------------------------------------------------------------- contact */
 .contact { min-height: 100svh; }
 
