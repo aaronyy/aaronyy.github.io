@@ -23,6 +23,11 @@
 
 <!-- ambient layers ------------------------------------------------------- -->
 <canvas id="scene" aria-hidden="true"></canvas>
+<!-- EDIT ME: point data-src at a photo of yourself, e.g.
+     data-src="assets/img/portrait.jpg", and the cloud will sample that
+     instead of the drawn stand-in. A plain head-and-shoulders shot on a
+     simple background reads best, since the particles follow the light. -->
+<canvas id="portrait" data-src="" aria-hidden="true"></canvas>
 <canvas id="flock" aria-hidden="true"></canvas>
 
 <!-- header --------------------------------------------------------------- -->
@@ -168,6 +173,7 @@
 
 <script src="assets/js/flock.js"></script>
 <script src="assets/js/scene.js"></script>
+<script src="assets/js/portrait.js"></script>
 <script src="assets/js/site.js"></script>
 </body>
 </html>

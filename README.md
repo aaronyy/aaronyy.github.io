@@ -9,6 +9,7 @@ index.html              markup and all copy
 assets/css/main.css     design tokens, layout, reveal transitions
 assets/js/flock.js      boid flock + the glyph letter on the hero
 assets/js/scene.js      the wireframe that turns beside the story
+assets/js/portrait.js   the point cloud that gathers into a portrait
 assets/js/site.js       scroll state, chapter rail, cue words, cipher
 ```
 
@@ -22,6 +23,18 @@ Everything you'd want to change is in `index.html`, marked with `EDIT ME`:
 - **The chapters.** Each `<section class="chapter">` is one beat. Add or remove
   them freely — the header rail, the scroll progress and the wireframe all
   count the chapters at runtime.
+- **Your portrait.** The `#portrait` canvas has an empty `data-src`. Drop a
+  photo in `assets/img/` and point it there:
+
+  ```html
+  <canvas id="portrait" data-src="assets/img/portrait.jpg" aria-hidden="true"></canvas>
+  ```
+
+  Until you do, a drawn head-and-shoulders stand-in is sampled instead, so the
+  animation works either way. A plain shot on a simple background reads best,
+  because particle density follows the light in the image: bright pixels are
+  kept more often than dark ones. If the cloud looks too sparse or too dense,
+  tune `MAX_POINTS` and the luminance threshold in `portrait.js`.
 - **Your email.** The `data-rot` attribute on the cipher button holds your
   address rotated thirteen places, so scrapers see nonsense. To generate it:
 
@@ -40,6 +53,7 @@ Everything you'd want to change is in `index.html`, marked with `EDIT ME`:
 | Glyph letter | `flock.js` | A character is rasterised offscreen and its opaque pixels become particle homes |
 | Wireframe | `scene.js` | Subdivided icosahedron, hand-rolled perspective projection |
 | Chapter morph | `scene.js` | Each chapter seeds per-vertex radial offsets; topology is shared so the cage eases between them |
+| Portrait gather | `portrait.js` | Pixels sampled from a photo become particle targets; scroll drives each one from a scattered origin, staggered per particle |
 | Chapter reveals | `main.css` | Opacity, translate and blur, staggered per child |
 
 `prefers-reduced-motion: reduce` drops both canvases and shows all copy

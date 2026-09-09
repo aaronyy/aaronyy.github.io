@@ -7,8 +7,10 @@
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var flock = window.Flock || { setMode: function () {}, setHeroFade: function () {} };
   var scene = window.Scene || { setChapter: function () {}, setFade: function () {} };
+  var portrait = window.Portrait || { setProgress: function () {} };
 
   var hero = document.querySelector('.hero');
+  var contactSection = document.getElementById('contact');
   var chapters = Array.prototype.slice.call(document.querySelectorAll('.chapter'));
   var rail = document.getElementById('rail');
   var hint = document.getElementById('scrollHint');
@@ -86,8 +88,20 @@
     var heroProgress = Math.min(1, y / (vh * 0.75));
     flock.setHeroFade(1 - heroProgress);
 
-    /* the wireframe fades in as the hero leaves */
-    scene.setFade(Math.max(0, Math.min(1, (y - vh * 0.35) / (vh * 0.45))));
+    /* The portrait gathers as the contact section comes up: nothing at the
+       moment its top crosses the viewport bottom, fully assembled by the time
+       that top has climbed to roughly the top of the screen. */
+    var portraitP = 0;
+    if (contactSection) {
+      var top = contactSection.getBoundingClientRect().top;
+      portraitP = Math.max(0, Math.min(1, (vh - top) / (vh * 0.85)));
+    }
+    portrait.setProgress(portraitP);
+
+    /* The wireframe fades in as the hero leaves, then back out as the portrait
+       takes over the same patch of screen. */
+    var sceneFade = Math.max(0, Math.min(1, (y - vh * 0.35) / (vh * 0.45)));
+    scene.setFade(sceneFade * Math.max(0, 1 - portraitP * 2.4));
 
     if (hint) hint.classList.toggle('gone', y > 60);
 
