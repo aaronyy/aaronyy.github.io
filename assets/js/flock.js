@@ -106,6 +106,16 @@
      second oscillator. */
   var CAM = 0.55;                       // enough height on a flap, not a toy camera
 
+  function chevronSlot(L, i) {
+    var rank = Math.ceil(i / 2);
+    var side = i % 2 ? 1 : -1;
+    var hx = Math.cos(L.heading), hy = Math.sin(L.heading);
+    return {
+      x: L.x - hx * 24 * rank - hy * side * 28 * rank,
+      y: L.y - hy * 24 * rank + hx * side * 28 * rank
+    };
+  }
+
   function buildBirds() {
     var count = W < 700 ? 7 : W < 1200 ? 11 : 15;
     birds = [];
@@ -169,18 +179,30 @@
 
     var elapsed = t - modeSince;
     var blend = mode === 'idle' ? 1 : Math.min(1, elapsed / 20);
-    var prevLX = birds[0] ? birds[0].x : 0;
-    var prevLY = birds[0] ? birds[0].y : 0;
+    var leader = birds[0];
 
     for (var i = 0; i < birds.length; i++) {
-      /* Followers in gather are placed on the V after the lead moves. */
-      if (mode === 'gather' && i > 0) continue;
-
       var b = birds[i];
+      var slotX = 0, slotY = 0, slotDist = 0, slotAlong = 0;
+      if (mode === 'gather' && i > 0 && leader) {
+        var slot = chevronSlot(leader, i);
+        slotX = slot.x;
+        slotY = slot.y;
+        slotDist = Math.hypot(slotX - b.x, slotY - b.y);
+        slotAlong = (slotX - b.x) * Math.cos(leader.heading) +
+                    (slotY - b.y) * Math.sin(leader.heading);
+      }
+
       /* Lead bird on scale: fly as if the rest of the flock isn't there. */
       var f = (mode === 'gather' && i === 0) ? { x: 0, y: 0 } : flockForces(b, i);
       var maxSpeed = 1.55;
       var minSpeed = 0.85;
+
+      if (mode === 'gather' && i > 0) {
+        var loose = clamp(slotDist / 160, 0, 1);
+        f.x *= 0.2 + loose * 0.35;
+        f.y *= 0.2 + loose * 0.35;
+      }
 
       /* a little thrust along the beak so opposing forces can't park a bird */
       f.x += Math.cos(b.heading) * 0.02;
@@ -188,10 +210,27 @@
 
       /* ---- wander: cheap smooth noise from stacked sines ---- */
       var n = b.wanderSeed;
-      f.x += Math.sin(t * 0.011 + n) * 0.012;
-      f.y += Math.cos(t * 0.009 + n * 1.7) * 0.010;
+      var wanderAmp = (mode === 'gather' && i > 0) ? clamp(slotDist / 140, 0.12, 1) : 1;
+      f.x += Math.sin(t * 0.011 + n) * 0.012 * wanderAmp;
+      f.y += Math.cos(t * 0.009 + n * 1.7) * 0.010 * wanderAmp;
 
-      if (mode === 'race') {
+      if (mode === 'gather' && i > 0 && leader) {
+        /* Fly into the V: keep the lead's cruise, close the slot error,
+           and add a little extra speed when still behind / off-station. */
+        var leadSp = Math.hypot(leader.vx, leader.vy) || 1.2;
+        var catchup = slotAlong > 8 ? clamp(slotAlong / 180, 0, 1) : 0;
+        var off = clamp(slotDist / 140, 0, 1);
+        var extra = catchup * 1.6 + off * 0.85;
+        maxSpeed = leadSp + 0.15 + extra;
+        minSpeed = slotDist < 28 ? Math.max(0.8, leadSp - 0.15) : 0.8;
+        if (slotAlong < -16) maxSpeed = Math.min(maxSpeed, leadSp * 0.84);
+
+        var close = 0.008 + off * 0.012;
+        var match = 0.05 + (1 - off) * 0.07;
+        f.x += (leader.vx + (slotX - b.x) * close - b.vx) * match;
+        f.y += (leader.vy + (slotY - b.y) * close - b.vy) * match;
+
+      } else if (mode === 'race') {
         /* everyone accelerates along their current heading */
         maxSpeed = 4.6;
         minSpeed = 1.4;
@@ -219,7 +258,7 @@
         f.y += (Math.cos(slot) * tang - b.vy) * 0.05 * blend;
       }
 
-      limit(f, 0.22);
+      limit(f, (mode === 'gather' && i > 0) ? 0.28 : 0.22);
       b.vx += f.x * dt;
       b.vy += f.y * dt;
 
@@ -238,8 +277,13 @@
       /* turn toward where velocity is pointing, then fly that heading —
          no sideways sliding, no snap-turns */
       var wantH = Math.atan2(b.vy, b.vx);
+      if (mode === 'gather' && i > 0 && leader && slotDist < 80) {
+        var align = 1 - slotDist / 80;
+        wantH += wrapPi(leader.heading - wantH) * align * 0.5;
+      }
       var dh = wrapPi(wantH - b.heading);
-      var maxTurn = (mode === 'gather' ? 0.016 : 0.10) * dt;
+      var maxTurn = 0.10 * dt;
+      if (mode === 'gather') maxTurn = (i === 0 ? 0.016 : 0.068) * dt;
       dh = clamp(dh, -maxTurn, maxTurn);
       b.heading += dh;
       b.vx = Math.cos(b.heading) * speed;
@@ -250,8 +294,10 @@
 
       /* wrap with a generous margin so nothing pops at the edge, and drop the
          trail on the way through or it gets drawn straight across the page.
-         In gather the whole V shifts together later, so individuals don't wrap. */
-      if (mode !== 'gather') {
+         Birds already on the V wrap with the lead later. */
+      var nearLead = mode === 'gather' && (i === 0 ||
+        (leader && Math.hypot(b.x - leader.x, b.y - leader.y) < 220));
+      if (!nearLead) {
         var pad = 90;
         var wrapped = false;
         if (b.x < -pad)     { b.x = W + pad; wrapped = true; }
@@ -298,47 +344,10 @@
       bird.flapPhase += (omega + couple) * dt * bird.flapRate;
     }
 
-    /* Everyone else rides the lead bird's motion and settles onto a
-       chevron behind it, matching its heading so the V doesn't spin. */
+    /* The lead and anyone already on the V wrap together. Stragglers
+       wrap on their own so a teleport doesn't yank them into formation. */
     if (mode === 'gather' && birds[0]) {
       var L = birds[0];
-      var ldx = L.x - prevLX;
-      var ldy = L.y - prevLY;
-      var settle = 1 - Math.pow(0.74, dt);
-      if (blend < 1) settle *= 0.45 + 0.55 * blend;
-
-      for (i = 1; i < birds.length; i++) {
-        var follower = birds[i];
-        var rank = Math.ceil(i / 2);
-        var side = i % 2 ? 1 : -1;
-        var hx = Math.cos(L.heading), hy = Math.sin(L.heading);
-        var back = 24 * rank;
-        var out = 28 * rank;
-        var slotX = L.x - hx * back - hy * side * out;
-        var slotY = L.y - hy * back + hx * side * out;
-
-        follower.x += ldx;
-        follower.y += ldy;
-        follower.x += (slotX - follower.x) * settle;
-        follower.y += (slotY - follower.y) * settle;
-        follower.vx = L.vx;
-        follower.vy = L.vy;
-
-        var turn = wrapPi(L.heading - follower.heading);
-        follower.heading += blend >= 1 ? turn : turn * Math.min(1, settle * 1.6);
-
-        follower.roll += (L.roll - follower.roll) * Math.min(1, 0.18 * dt);
-        follower.pitch += (L.pitch - follower.pitch) * Math.min(1, 0.14 * dt);
-
-        var fn = follower.wanderSeed;
-        follower.z += Math.sin(t * 0.0065 + fn * 0.4) * 0.003 * dt;
-        follower.z = clamp(follower.z, -1, 1);
-
-        follower.trail.push(follower.x, follower.y);
-        while (follower.trail.length > 16) follower.trail.shift();
-      }
-
-      /* The V flies off-screen as a unit, then comes back the other side. */
       var dx = 0, dy = 0;
       var gpad = 140;
       if (L.x > W + gpad) dx = -(W + 2 * gpad);
@@ -346,7 +355,9 @@
       if (L.y > H + gpad) dy = -(H + 2 * gpad);
       else if (L.y < -gpad) dy = H + 2 * gpad;
       if (dx || dy) {
+        var lx = L.x, ly = L.y;
         for (i = 0; i < birds.length; i++) {
+          if (i && Math.hypot(birds[i].x - lx, birds[i].y - ly) > 240) continue;
           birds[i].x += dx;
           birds[i].y += dy;
           birds[i].trail.length = 0;
