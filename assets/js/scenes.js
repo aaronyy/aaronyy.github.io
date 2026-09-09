@@ -14,7 +14,6 @@
      dolly       camera distance multiplier
      gain        ink multiplier when a scene sits farther from the camera
      paper       structural lines in the page off-white instead of cool grey
-     weight      stroke width, for a scene with more detail than the default
      draw(g, sec)     sec counts from the moment the chapter came on screen
 
    Coordinates are in units of the scene radius: +y is down, +z is toward the
@@ -1146,7 +1145,7 @@
     return {
       spin: 0.05, yaw: 0.22, swing: 0.18, swingRate: 0.08,
       tilt: -0.44, sway: 0.07, swayRate: 0.07,
-      scale: 1.42, dolly: 0.68, gain: 1.85, paper: true, weight: 1.1,
+      scale: 1.42, dolly: 0.68, gain: 2.7,
       draw: function (g, sec) {
         var drift = sec * 0.055;
         var j, k, x, f;
