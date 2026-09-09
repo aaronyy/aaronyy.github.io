@@ -318,7 +318,7 @@
       cy = H * 0.50;
       scale = Math.min(H * 0.82, W * 0.42);
     } else {
-      /* on a phone it sits centred and higher, above the contact copy */
+      /* on a phone it sits centred and higher, above the last-chapter copy */
       cx = W * 0.5;
       cy = H * 0.28;
       scale = Math.min(H * 0.40, W * 0.70);

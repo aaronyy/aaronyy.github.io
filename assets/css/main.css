@@ -195,37 +195,18 @@ main { position: relative; z-index: 5; }
   letter-spacing: .16em;
 }
 
-.links a,
-.cipher {
+.links a {
   color: var(--ink-mute);
   text-decoration: none;
-  font: inherit;
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
   border-bottom: 1px solid transparent;
   transition: color .35s var(--ease), border-color .35s var(--ease);
 }
 .links a:hover,
-.links a:focus-visible,
-.cipher:hover,
-.cipher:focus-visible {
+.links a:focus-visible {
   color: var(--gold);
   border-color: var(--ink-faint);
   outline: none;
 }
-
-/* the per-character flip when the cipher unrolls */
-.cipher .ch {
-  display: inline-block;
-  transition: transform .5s var(--ease), opacity .5s var(--ease);
-}
-.cipher.turning .ch {
-  transform: rotateX(180deg);
-  opacity: .25;
-}
-.cipher.done { color: var(--ink); }
 
 /* -------------------------------------------------------------- masthead */
 .masthead {
@@ -264,7 +245,7 @@ main { position: relative; z-index: 5; }
   border-color: var(--ink-faint);
 }
 
-/* chapter rail: one tick per chapter, with a bird marker riding along */
+/* chapter rail: one tick per chapter, with a dot riding the current one */
 .rail {
   position: relative;
   display: flex;
@@ -283,19 +264,19 @@ main { position: relative; z-index: 5; }
   transition: background-color .35s var(--ease);
 }
 .rail .tick.past { background: var(--ink-mute); }
-.rail .tick.here { background: var(--gold); }
+.rail .tick.here { background: transparent; }
 
 .rail .marker {
   position: absolute;
   top: 50%;
   left: 0;
-  width: .6rem;
-  height: .6rem;
-  margin-top: -.3rem;
-  color: var(--gold);
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  background: var(--gold);
+  border-radius: 50%;
   transition: transform .5s var(--ease);
 }
-.rail .marker svg { display: block; width: 100%; height: 100%; }
 
 @media (max-width: 44rem) {
   .rail { display: none; }

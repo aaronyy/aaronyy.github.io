@@ -47,6 +47,12 @@
     return v < a ? a : v > b ? b : v;
   }
 
+  function wrapPi(a) {
+    while (a > Math.PI) a -= Math.PI * 2;
+    while (a < -Math.PI) a += Math.PI * 2;
+    return a;
+  }
+
   /* --------------------------------------------------------- the letter */
 
   /* Rasterise a character offscreen, then keep every opaque pixel on a grid.
@@ -99,7 +105,6 @@
      drifting on its own clock. flapRate is a tiny personal tempo, not a
      second oscillator. */
   var CAM = 0.55;                       // enough height on a flap, not a toy camera
-  var gatherDir = 1;                   // cruise heading for the V's lead bird
 
   function buildBirds() {
     var count = W < 700 ? 7 : W < 1200 ? 11 : 15;
@@ -164,56 +169,32 @@
 
     var elapsed = t - modeSince;
     var blend = mode === 'idle' ? 1 : Math.min(1, elapsed / 20);
-    var leader = birds[0];
+    var prevLX = birds[0] ? birds[0].x : 0;
+    var prevLY = birds[0] ? birds[0].y : 0;
 
     for (var i = 0; i < birds.length; i++) {
+      /* Followers in gather are placed on the V after the lead moves. */
+      if (mode === 'gather' && i > 0) continue;
+
       var b = birds[i];
-      var f = flockForces(b, i);
+      /* Lead bird on scale: fly as if the rest of the flock isn't there. */
+      var f = (mode === 'gather' && i === 0) ? { x: 0, y: 0 } : flockForces(b, i);
       var maxSpeed = 1.55;
-      var slotX = b.x, slotY = b.y, hasSlot = false;
+      var minSpeed = 0.85;
+
+      /* a little thrust along the beak so opposing forces can't park a bird */
+      f.x += Math.cos(b.heading) * 0.02;
+      f.y += Math.sin(b.heading) * 0.02;
 
       /* ---- wander: cheap smooth noise from stacked sines ---- */
       var n = b.wanderSeed;
       f.x += Math.sin(t * 0.011 + n) * 0.012;
       f.y += Math.cos(t * 0.009 + n * 1.7) * 0.010;
 
-      if (mode === 'gather') {
-        /* Flocking and wander fight the V, so they fade out as the
-           formation takes over. The lead bird cruises in one heading;
-           everyone else owns a slot on a wide chevron behind it. */
-        var hold = 1 - blend;
-        f.x *= hold;
-        f.y *= hold;
-        maxSpeed = 2.2;
-        if (i === 0) {
-          var cruise = gatherDir > 0 ? -0.05 : Math.PI + 0.05;
-          var cs = 0.9;
-          var homeX = W >= 992 ? W * 0.55 : W * 0.55;
-          var homeY = H * 0.32;
-          f.x += (homeX - b.x) * 0.012 * blend;
-          f.y += (homeY - b.y) * 0.012 * blend;
-          f.x += (Math.cos(cruise) * cs - b.vx) * 0.12 * blend;
-          f.y += (Math.sin(cruise) * cs - b.vy) * 0.12 * blend;
-        } else {
-          hasSlot = true;
-          var rank = Math.ceil(i / 2);
-          var side = i % 2 ? 1 : -1;
-          var hx = Math.cos(leader.heading), hy = Math.sin(leader.heading);
-          var back = 22 * rank;
-          var out = 26 * rank;
-          slotX = leader.x - hx * back - hy * side * out;
-          slotY = leader.y - hy * back + hx * side * out;
-          f.x += (slotX - b.x) * 0.018 * blend;
-          f.y += (slotY - b.y) * 0.018 * blend;
-          f.x += (leader.vx - b.vx) * 0.10 * blend;
-          f.y += (leader.vy - b.vy) * 0.10 * blend;
-          var dist = Math.hypot(slotX - b.x, slotY - b.y);
-          maxSpeed = clamp(1.8 + dist * 0.01, 1.8, 5.2);
-        }
-
-      } else if (mode === 'race') {
+      if (mode === 'race') {
         /* everyone accelerates along their current heading */
         maxSpeed = 4.6;
+        minSpeed = 1.4;
         var m = Math.hypot(b.vx, b.vy) || 1;
         f.x += (b.vx / m) * 0.16 * blend;
         f.y += (b.vy / m) * 0.16 * blend;
@@ -222,16 +203,23 @@
       } else if (mode === 'ring') {
         /* Each bird owns a slot on a slowly turning circle around the letter,
            so the flock spreads evenly instead of bunching on one arc. */
+        var holdR = 1 - blend;
+        f.x *= holdR;
+        f.y *= holdR;
         maxSpeed = 2.1;
+        minSpeed = 1.1;
         var radius = Math.min(W, H) * 0.19;
         var slot = (i / birds.length) * Math.PI * 2 + t * 0.011;
         var tx = focusX + Math.cos(slot) * radius;
         var ty = focusY + Math.sin(slot) * radius;
-        f.x += (tx - b.x) * 0.0062 * blend;
-        f.y += (ty - b.y) * 0.0062 * blend;
+        var tang = 1.35;
+        f.x += (tx - b.x) * 0.005 * blend;
+        f.y += (ty - b.y) * 0.005 * blend;
+        f.x += (-Math.sin(slot) * tang - b.vx) * 0.05 * blend;
+        f.y += (Math.cos(slot) * tang - b.vy) * 0.05 * blend;
       }
 
-      limit(f, mode === 'gather' ? 0.55 : 0.22);
+      limit(f, 0.22);
       b.vx += f.x * dt;
       b.vy += f.y * dt;
 
@@ -239,32 +227,30 @@
       if (speed > maxSpeed) {
         b.vx = b.vx / speed * maxSpeed;
         b.vy = b.vy / speed * maxSpeed;
-      } else if (speed < 0.35) {
-        /* never let a bird stall into a hover */
-        var a2 = speed > 0 ? Math.atan2(b.vy, b.vx) : rand(0, Math.PI * 2);
-        b.vx = Math.cos(a2) * 0.35;
-        b.vy = Math.sin(a2) * 0.35;
+        speed = maxSpeed;
+      } else if (speed < minSpeed) {
+        var a2 = speed > 0.02 ? Math.atan2(b.vy, b.vx) : b.heading;
+        b.vx = Math.cos(a2) * minSpeed;
+        b.vy = Math.sin(a2) * minSpeed;
+        speed = minSpeed;
       }
+
+      /* turn toward where velocity is pointing, then fly that heading —
+         no sideways sliding, no snap-turns */
+      var wantH = Math.atan2(b.vy, b.vx);
+      var dh = wrapPi(wantH - b.heading);
+      var maxTurn = (mode === 'gather' ? 0.016 : 0.10) * dt;
+      dh = clamp(dh, -maxTurn, maxTurn);
+      b.heading += dh;
+      b.vx = Math.cos(b.heading) * speed;
+      b.vy = Math.sin(b.heading) * speed;
 
       b.x += b.vx * dt;
       b.y += b.vy * dt;
 
-      if (hasSlot) {
-        b.x += (slotX - b.x) * 0.08 * blend * dt;
-        b.y += (slotY - b.y) * 0.08 * blend * dt;
-      }
-
-      if (mode === 'gather' && i === 0) {
-        var rankMax = Math.ceil((birds.length - 1) / 2) || 1;
-        var trail = 22 * rankMax + 36;
-        var spread = 26 * rankMax + 24;
-        b.x = clamp(b.x, gatherDir > 0 ? trail : 60, gatherDir > 0 ? W - 60 : W - trail);
-        b.y = clamp(b.y, spread, H - spread);
-      }
-
       /* wrap with a generous margin so nothing pops at the edge, and drop the
          trail on the way through or it gets drawn straight across the page.
-         Skip it in gather so birds fly to the V instead of teleporting. */
+         In gather the whole V shifts together later, so individuals don't wrap. */
       if (mode !== 'gather') {
         var pad = 90;
         var wrapped = false;
@@ -275,13 +261,7 @@
         if (wrapped) b.trail.length = 0;
       }
 
-      var h = Math.atan2(b.vy, b.vx);
-      var dh = h - b.heading;
-      while (dh > Math.PI) dh -= Math.PI * 2;
-      while (dh < -Math.PI) dh += Math.PI * 2;
-      b.heading = h;
       var targetRoll = clamp(-dh / Math.max(dt, 0.001) * 0.42, -0.95, 0.95);
-      if (mode === 'gather') targetRoll *= 0.35;
       b.roll += (targetRoll - b.roll) * Math.min(1, 0.14 * dt);
       var targetPitch = clamp(0.10 - b.vy * 0.14, -0.28, 0.32);
       b.pitch += (targetPitch - b.pitch) * Math.min(1, 0.10 * dt);
@@ -316,6 +296,62 @@
       if (mode === 'race') omega *= 1.28;
       var couple = nNear ? (sum / nNear) * kFlap : 0;
       bird.flapPhase += (omega + couple) * dt * bird.flapRate;
+    }
+
+    /* Everyone else rides the lead bird's motion and settles onto a
+       chevron behind it, matching its heading so the V doesn't spin. */
+    if (mode === 'gather' && birds[0]) {
+      var L = birds[0];
+      var ldx = L.x - prevLX;
+      var ldy = L.y - prevLY;
+      var settle = 1 - Math.pow(0.74, dt);
+      if (blend < 1) settle *= 0.45 + 0.55 * blend;
+
+      for (i = 1; i < birds.length; i++) {
+        var follower = birds[i];
+        var rank = Math.ceil(i / 2);
+        var side = i % 2 ? 1 : -1;
+        var hx = Math.cos(L.heading), hy = Math.sin(L.heading);
+        var back = 24 * rank;
+        var out = 28 * rank;
+        var slotX = L.x - hx * back - hy * side * out;
+        var slotY = L.y - hy * back + hx * side * out;
+
+        follower.x += ldx;
+        follower.y += ldy;
+        follower.x += (slotX - follower.x) * settle;
+        follower.y += (slotY - follower.y) * settle;
+        follower.vx = L.vx;
+        follower.vy = L.vy;
+
+        var turn = wrapPi(L.heading - follower.heading);
+        follower.heading += blend >= 1 ? turn : turn * Math.min(1, settle * 1.6);
+
+        follower.roll += (L.roll - follower.roll) * Math.min(1, 0.18 * dt);
+        follower.pitch += (L.pitch - follower.pitch) * Math.min(1, 0.14 * dt);
+
+        var fn = follower.wanderSeed;
+        follower.z += Math.sin(t * 0.0065 + fn * 0.4) * 0.003 * dt;
+        follower.z = clamp(follower.z, -1, 1);
+
+        follower.trail.push(follower.x, follower.y);
+        while (follower.trail.length > 16) follower.trail.shift();
+      }
+
+      /* The V flies off-screen as a unit, then comes back the other side. */
+      var dx = 0, dy = 0;
+      var gpad = 140;
+      if (L.x > W + gpad) dx = -(W + 2 * gpad);
+      else if (L.x < -gpad) dx = W + 2 * gpad;
+      if (L.y > H + gpad) dy = -(H + 2 * gpad);
+      else if (L.y < -gpad) dy = H + 2 * gpad;
+      if (dx || dy) {
+        for (i = 0; i < birds.length; i++) {
+          birds[i].x += dx;
+          birds[i].y += dy;
+          birds[i].trail.length = 0;
+        }
+      }
     }
   }
 
@@ -461,7 +497,7 @@
 
   function frame(now) {
     if (!running) return;
-    var dt = last ? Math.min(3, (now - last) / 16.667) : 1;
+    var dt = last ? Math.min(2, (now - last) / 16.667) : 1;
     last = now;
 
     ctx.clearRect(0, 0, W, H);
@@ -497,14 +533,6 @@
       if (m === mode) return;
       mode = m || 'idle';
       modeSince = t;
-      if (mode === 'gather' && birds[0]) {
-        gatherDir = birds[0].vx >= 0 ? 1 : -1;
-        var cruise = gatherDir > 0 ? -0.04 : Math.PI + 0.04;
-        var sp = Math.max(1.4, Math.hypot(birds[0].vx, birds[0].vy));
-        birds[0].vx = Math.cos(cruise) * sp;
-        birds[0].vy = Math.sin(cruise) * sp;
-        birds[0].heading = cruise;
-      }
     },
     setHeroFade: function (v) {
       heroFade = Math.max(0, Math.min(1, v));

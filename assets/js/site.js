@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
-   site.js — scroll orchestration, chapter rail, cue words, cipher reveal.
+   site.js — scroll orchestration, chapter rail, cue words.
 --------------------------------------------------------------------------- */
 (function () {
   'use strict';
@@ -18,22 +18,19 @@
 
   /* ------------------------------------------------------- chapter rail */
 
-  var BIRD = '<svg viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">' +
-             '<path d="M0 3.4 5.2 6 0 8.6 1.9 6z M5.6 5.4 12 2.2 6.6 6 12 9.8 5.6 6.6z"/></svg>';
-
   var ticks = [];
   var marker = null;
 
   function buildRail() {
     if (!rail) return;
-    /* one tick per chapter, contact excluded — it gets its own nav word */
+    /* one tick per story chapter, contact excluded — it gets its own nav word */
     var storyCount = chapters.filter(function (c) {
       return c.dataset.chapter !== 'contact';
     }).length;
 
     var html = '';
     for (var i = 0; i < storyCount; i++) html += '<span class="tick"></span>';
-    rail.innerHTML = html + '<span class="marker">' + BIRD + '</span>';
+    rail.innerHTML = html + '<span class="marker"></span>';
 
     ticks = Array.prototype.slice.call(rail.querySelectorAll('.tick'));
     marker = rail.querySelector('.marker');
@@ -170,50 +167,6 @@
       cue._timer = setTimeout(release, 4200);
     });
   });
-
-  /* ------------------------------------------------------------ cipher */
-
-  function rot13(s) {
-    return s.replace(/[a-z]/gi, function (c) {
-      var base = c <= 'Z' ? 65 : 97;
-      return String.fromCharCode((c.charCodeAt(0) - base + 13) % 26 + base);
-    });
-  }
-
-  var cipher = document.getElementById('cipher');
-  var cipherHint = document.getElementById('cipherHint');
-  if (cipher) {
-    /* wrap each character so they can turn over individually */
-    function render(text) {
-      cipher.innerHTML = text.split('').map(function (c) {
-        return '<span class="ch">' + (c === ' ' ? '&nbsp;' : c) + '</span>';
-      }).join('');
-    }
-    render(cipher.dataset.rot);
-
-    var turned = false;
-    cipher.addEventListener('click', function () {
-      var plain = rot13(cipher.dataset.rot);
-
-      if (turned) {
-        window.location.href = 'mailto:' + plain;
-        return;
-      }
-      turned = true;
-
-      cipher.classList.add('turning');
-      setTimeout(function () {
-        render(plain);
-        cipher.classList.remove('turning');
-        cipher.classList.add('done');
-        cipher.title = 'click again to send mail';
-        if (cipherHint) {
-          cipherHint.textContent =
-            'And there you go. You found me. Say hello.';
-        }
-      }, 380);
-    });
-  }
 
   /* -------------------------------------------------------------- boot */
 

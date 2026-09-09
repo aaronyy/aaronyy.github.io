@@ -8,9 +8,10 @@ A single-page personal site. Static files, no build step, no dependencies.
 index.html              markup and all copy
 assets/css/main.css     design tokens, layout, reveal transitions
 assets/js/flock.js      boid flock + the glyph letter on the hero
-assets/js/scene.js      the wireframe that turns beside the story
+assets/js/scene.js      camera, ink and cross-dissolve for the story wireframe
+assets/js/scenes.js     the shape each chapter draws through that camera
 assets/js/portrait.js   the point cloud that gathers into a portrait
-assets/js/site.js       scroll state, chapter rail, cue words, cipher
+assets/js/site.js       scroll state, chapter rail, cue words
 assets/img/portrait.png the cut-out the point cloud samples
 tools/cutout.swift      regenerates that cut-out from a photo
 tools/source-photo.png  the photo it was cut out of
@@ -25,7 +26,9 @@ Everything you'd want to change is in `index.html`, marked with `EDIT ME`:
   rename the words to whatever you like.
 - **The chapters.** Each `<section class="chapter">` is one beat. Add or remove
   them freely — the header rail, the scroll progress and the wireframe all
-  count the chapters at runtime.
+  count the chapters at runtime. The wireframe beside a chapter comes from
+  `BUILDERS` at the bottom of `scenes.js`, keyed by chapter number; anything
+  without an entry falls back to the globe.
 - **Your portrait.** `assets/img/portrait.png` is what the point cloud samples.
   Swap the file, or point `data-src` on the `#portrait` canvas somewhere else.
   Clear `data-src` entirely and a drawn head-and-shoulders stand-in is sampled
@@ -46,12 +49,6 @@ Everything you'd want to change is in `index.html`, marked with `EDIT ME`:
   the three terms in `density`: a base so flat areas don't hollow out, a tone
   term so lit skin separates from dark clothing, and a local contrast term
   that keeps features legible once colour is gone.
-- **Your email.** The `data-rot` attribute on the cipher button holds your
-  address rotated thirteen places, so scrapers see nonsense. To generate it:
-
-  ```sh
-  node -e 'console.log(process.argv[1].replace(/[a-z]/gi,c=>{const b=c<="Z"?65:97;return String.fromCharCode((c.charCodeAt(0)-b+13)%26+b)}))' you@example.com
-  ```
 
 ## Animations
 
@@ -62,8 +59,14 @@ Everything you'd want to change is in `index.html`, marked with `EDIT ME`:
 | `race` | `flock.js` | Raises the speed ceiling and adds thrust along each heading |
 | `ring` | `flock.js` | Tangential orbit at a fixed radius around the letter |
 | Glyph letter | `flock.js` | A character is rasterised offscreen and its opaque pixels become particle homes |
-| Wireframe | `scene.js` | Subdivided icosahedron, hand-rolled perspective projection |
-| Chapter morph | `scene.js` | Each chapter seeds per-vertex radial offsets; topology is shared so the cage eases between them |
+| Wireframe camera | `scene.js` | Hand-rolled perspective projection, depth-faded lines, one warm accent tone. Scenes are authored in units of the scene radius through a tiny 3D API (`line`, `path`, `fill`, `dot`, `glyph`) |
+| Chapter dissolve | `scene.js` | Chapters no longer share a topology, so the outgoing shape cross-fades into the incoming one over 0.85s. Each scene runs its own clock from the moment it arrives, so its loop starts while you are looking at it |
+| Passport | `scenes.js` | An open passport, printed fields and a machine-readable strip; a stamp comes down every 6s and leaves a mark, documents drift up around it |
+| Globe | `scenes.js` | The original subdivided icosahedron and glyph cloud, with characters turning over and a phrase hopping the surface |
+| Site and robots | `scenes.js` | A floor plate every 2.2s until it tops out, a crane swinging loads in, robots welding their way around the top plate, then the frame comes apart from the top down |
+| Interior | `scenes.js` | A room corner with daylight on the floor, rearranging itself into a new furniture plan every 6s |
+| Reconstruction | `scenes.js` | A camera orbits a point cloud; wherever it has just been, the model commits and the frame's matched features appear on the image plane |
+| Mill | `scenes.js` | Rolling ground scrolling past a sawtooth-roofed mill, and a loom laying down one weft thread per pass of the shuttle until there is a carpet |
 | Portrait gather | `portrait.js` | Pixels sampled from a photo become particle targets; scroll drives each one from a scattered origin, staggered per particle. Density carries the likeness, so the dots stay an even brightness the way a stipple drawing does |
 | Chapter reveals | `main.css` | Opacity, translate and blur, staggered per child |
 
