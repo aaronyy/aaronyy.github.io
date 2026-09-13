@@ -1,0 +1,1 @@
+{"source": "NSIDC Sea Ice Index, Version 4 (G02135), September monthly extent, Arctic. Fetterer et al., National Snow and Ice Data Center. Years before 1979 reuse the 1980 extent.", "steps": 12, "cols": 5, "rows": 3, "tileWidth": 720, "tileHeight": 180, "latMin": 45.0, "years": [-10000, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2024, 2025]}

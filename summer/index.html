@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Eleven Thousand Summers</title>
+  <meta name="description" content="Since the ice let go: everyone, everywhere, a summer at a time. Twelve thousand years of people, civilizations and their inventions on one map, with its turning points, and the great eruptions as punctuation.">
+  <meta name="theme-color" content="#02030a">
+  <link rel="icon" href="data:image/svg+xml,<svg viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg'><defs><radialGradient id='g' cx='50%' cy='50%' r='50%'><stop offset='0' stop-color='%23fff1c8'/><stop offset='0.3' stop-color='%23ffb347'/><stop offset='0.65' stop-color='%238a3a10' stop-opacity='0.9'/><stop offset='1' stop-color='%2302030a' stop-opacity='0'/></radialGradient></defs><circle cx='32' cy='32' r='31' fill='%2302030a'/><circle cx='32' cy='32' r='27' fill='url(%23g)'/><circle cx='32' cy='32' r='20' fill='none' stroke='%23e8e4dc' stroke-opacity='0.35'/><circle cx='32' cy='32' r='3.5' fill='%23fff8e6'/></svg>">
+  <script type="module" crossorigin src="./assets/index-Ck40dZ_4.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DTLx0OOO.css">
+</head>
+<body>
+  <canvas id="globe" aria-label="Map of the world showing where people lived through history"></canvas>
+  <div id="labels" aria-hidden="true"></div>
+  <ul id="labels-sr" class="sr-only" aria-label="Civilizations shown on the globe"></ul>
+
+  <header id="title">
+    <h1><span class="mark" aria-hidden="true"></span>Eleven Thousand Summers</h1>
+    <p>Since the ice let go: everyone, everywhere, a summer at a time. <a class="byline" href="https://shuw.github.io/" rel="me" data-tip="Made by Shu Wu">shuw</a></p>
+  </header>
+
+  <nav id="controls" aria-label="Playback">
+    <button id="play" class="icon" aria-label="Play" data-tip="Play or pause · space">
+      <svg viewBox="0 0 24 24" class="ic-play"><path d="M7 4l13 8-13 8z"/></svg>
+      <svg viewBox="0 0 24 24" class="ic-pause"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+    </button>
+    <button id="speed" class="pill" data-tip="Playback speed · - =">1×</button>
+    <div id="mode" role="group" aria-label="Projection">
+      <button data-mode="map" aria-pressed="false" data-tip="Flat map · m">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5l6-2.5 6 2.5 6-2.5v13l-6 2.5-6-2.5-6 2.5z"/><path d="M9 4v13M15 6.5v13"/></svg>Map
+      </button>
+      <button data-mode="globe" class="on" aria-pressed="true" data-tip="Globe · g">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M5 7.5h14M5 16.5h14"/></svg>Globe
+      </button>
+    </div>
+    <button id="follow" class="icon" aria-label="Keep the map centred on where people live" aria-pressed="true" data-tip="Follow the centre of population · f">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
+    </button>
+    <button id="metrics-toggle" class="icon" aria-label="Metrics" aria-pressed="false" data-tip="Show stats on the timeline · s">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M4 16l5-5 4 3 7-8"/></svg>
+    </button>
+    <button id="about-toggle" class="icon" aria-label="About" data-tip="About the data · i">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 11v6M12 7.5v.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    </button>
+  </nav>
+
+  <div id="feed" aria-live="polite"></div>
+
+  <footer id="timeline">
+    <div id="readout">
+      <span id="year">10,000 BCE</span><span id="paused" aria-live="polite">paused</span>
+      <span id="pop"></span>
+      <span id="space"></span>
+      <span id="counts-wrap"><span id="counts"></span></span>
+    </div>
+    <div id="stats-legend" hidden><span class="stats-items"></span></div>
+    <div id="strip">
+      <canvas id="scrubber" aria-label="Timeline scrubber" role="slider"></canvas>
+      <span class="stats-toggles">
+        <button id="scale" class="pill toggle" aria-pressed="true" data-tip="Each line on its own log scale; off, its own linear one">log scale</button>
+        <button id="axis" class="pill toggle" aria-pressed="false" data-tip="Plain linear time instead of the stretched story time">linear time</button>
+      </span>
+    </div>
+  </footer>
+
+  <div id="tooltip" class="tip" hidden>
+    <div class="tip-name"></div>
+    <div class="tip-where"></div>
+    <div class="tip-when"></div>
+    <a class="tip-link" target="_blank" rel="noopener">Smithsonian record ↗</a>
+  </div>
+
+  <div id="finale" class="finale" role="dialog" aria-live="polite" hidden>
+    <button id="finale-close" class="icon" aria-label="Close">×</button>
+    <div class="finale-year">Today</div>
+    <div class="finale-people" id="finale-people"></div>
+    <div class="finale-counts" id="finale-counts"></div>
+    <p class="finale-quote">every human being who ever was, lived out their lives<small>Carl Sagan, Pale Blue Dot</small></p>
+    <button id="replay" class="pill">Play it again</button>
+  </div>
+
+  <div id="hovercard" hidden><b></b><span></span><i></i></div>
+  <div id="toast" hidden></div>
+  <div id="tip" role="tooltip" hidden></div>
+  <div id="loading">twelve thousand years, loading…</div>
+
+  <aside id="about" hidden>
+    <button id="about-close" class="icon" aria-label="Close">×</button>
+    <h2>Eleven Thousand Summers</h2>
+    <p>Twelve thousand years ago the ice let go, and people began to stay put. This is what happened next, on one map. The glow is where people were, from a few million foragers to eight billion; the colours are the civilizations they belonged to. Hover or tap anything for its story.</p>
+    <ul class="key">
+      <li><i class="dot ice"></i>ice, sheets and September sea ice</li>
+      <li><i class="dot people"></i>people, coloured by civilization</li>
+      <li><i class="dot city"></i>cities, from their first record</li>
+      <li><i class="dot move"></i>people on the move</li>
+      <li><i class="dot trade"></i>trade routes</li>
+      <li><i class="dot tech"></i>inventions, cables, satellites, data centres</li>
+      <li><i class="dot witnessed"></i>turning points: climate, plagues, empires, ideas, eruptions</li>
+    </ul>
+    <p>The cards are the turning points: droughts and plagues, empires rising and falling, voyages, revolutions, and the few eruptions that changed the weather. Every VEI&nbsp;6 eruption in the Smithsonian's record also bursts on the map, <b>sharp</b> where someone saw it happen, <b>smoky</b> where it was reconstructed from ash and ice. <code>?vei=4</code> shows the smaller ones.</p>
+    <p>The timeline opens at the last glacial maximum, 21,000 BCE, with the ice at its fullest and no one yet on the map. Play through it and the view flies in from beyond the Moon and unfolds the globe into the map; the story begins at 10,000 BCE, where the population record does. The lines on the way in, and on the closing card, are Carl Sagan's, from <i>Pale Blue Dot</i> (1994).</p>
+    <p>The civilizations, with their dates, extents and colours, are drawn by hand and approximate. This is a way of seeing the record, not a substitute for it.</p>
+    <h3>Data</h3>
+    <ul>
+      <li><a href="https://volcano.si.edu" target="_blank" rel="noopener">Smithsonian Institution, Global Volcanism Program</a>, Volcanoes of the World, Holocene eruption list.</li>
+      <li>Cities: <a href="https://doi.org/10.1038/sdata.2016.34" target="_blank" rel="noopener">Reba, Reitsma &amp; Seto (2016)</a>, digitised from Chandler and Modelski, CC BY 4.0.</li>
+      <li>Data centres: hand-curated from public announcements, illustrative. Data-centre power from the IEA.</li>
+      <li>Ice sheets: ICE-6G_C, <a href="https://www.atmosp.physics.utoronto.ca/~peltier/data.php" target="_blank" rel="noopener">Peltier, Argus &amp; Drummond (2015)</a>.</li>
+      <li>Sea ice: <a href="https://nsidc.org/data/g02135" target="_blank" rel="noopener">NSIDC Sea Ice Index, Version 4</a>, September Arctic extent; before 1979 the 1980 extent stands in.</li>
+      <li><a href="https://landuse.sites.uu.nl/hyde-project/" target="_blank" rel="noopener">HYDE 3.3</a>, Klein Goldewijk et al., PBL Netherlands Environmental Assessment Agency and Utrecht University, CC BY 3.0.</li>
+      <li>Coastlines and shaded relief: Natural Earth, public domain.</li>
+      <li>Satellites: scaled to cumulative launches from UNOOSA's index of objects launched into outer space. Cables and milestones are hand-written.</li>
+      <li>Civilization table, milestones, turning points and the notes on cities and cables are hand-written and approximate. Before 1500 the table lists the major cultural complexes with a placeable heartland; from 1500 on, the polities that held the most people in their era.</li>
+    </ul>
+    <h3>Keys</h3>
+    <p class="fine">scroll to move through time, pinch to zoom · <kbd>space</kbd> play / pause · <kbd>←</kbd> <kbd>→</kbd> scrub (<kbd>shift</kbd> for bigger steps) · <kbd>-</kbd> <kbd>=</kbd> speed · <kbd>m</kbd> map · <kbd>g</kbd> globe · <kbd>[</kbd> <kbd>]</kbd> turn the map · <kbd>f</kbd> follow the centre of population · <kbd>s</kbd> stats · <kbd>i</kbd> this panel · hover anything for its name, click a volcano for its record.</p>
+    <p class="fine">The address bar follows the current moment, so a copied link brings you back to it.</p>
+    <p class="fine">Made by <a href="https://shuw.github.io/" rel="me">Shu Wu</a>, with Three.js. Reconstruction of the published visualization.</p>
+  </aside>
+
+</body>
+</html>
